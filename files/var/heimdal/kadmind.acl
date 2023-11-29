@@ -1,0 +1,1 @@
+$(printf "%s@${realm} all\n" "$boxconf_user" ${kdc_admin_princs})

@@ -1,0 +1,106 @@
+#!/bin/sh
+
+# -----------------------------------------------------------------------------
+# BSD 2-Clause License
+#
+# Copyright (c) 2023, stonewall (stonewall@sacredheartsc.com)
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice, this
+#    list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+#    this list of conditions and the following disclaimer in the documentation
+#    and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# -----------------------------------------------------------------------------
+#                                                                           JMJ
+
+set -eu
+
+PROGNAME=boxconf
+USAGE="${PROGNAME} [-d] [-e VAR=VALUE]... [-o HOSTNAME] HOST"
+
+BOXCONF_ROOT=$(dirname "$(readlink -f "$0")")
+_BOXCONF_TARBALL_EXCLUDE='.ca_password'
+
+die(){
+  printf '%s: ERROR: %s\n' "$PROGNAME" "$1" 1>&2
+  exit "${2:-1}"
+}
+
+usage(){
+  [ $# -gt 0 ] && printf '%s\n' "$1"
+  printf 'usage: %s\n' "$USAGE"
+  exit 1
+}
+
+while getopts :hde:o: _bc_opt; do
+  case $_bc_opt in
+    h) usage ;;
+    d) set -x ;;
+    e) eval "$OPTARG" ;;
+    o) BOXCONF_HOSTNAME=$OPTARG ;;
+    :) usage "missing option value: -${OPTARG}" ;;
+    ?) usage "unknown option: -${OPTARG}" ;;
+  esac
+done
+
+# The target hostname is taken from the final argument.
+[ $(( OPTIND - $# )) -eq 1 ] && usage 'HOST not specified'
+eval "_bc_target=\$$#"
+
+if [ "$_bc_target" = localhost ]; then
+  # We're on the target box. First, ensure boxconf stuff is cleaned up on exit.
+  BOXCONF_CLEANUP_PATHS=$BOXCONF_ROOT
+
+  _boxconf_cleanup(){
+    rm -rf $BOXCONF_CLEANUP_PATHS
+  }
+
+  trap _boxconf_cleanup HUP INT QUIT TERM EXIT
+
+  # Source all files in ./lib
+  for _bc_lib in "${BOXCONF_ROOT}/lib"/*; do
+    . "$_bc_lib"
+  done
+
+  # Source box configuration scripts.
+  _boxconf_run
+else
+  # Send a boxconf tarball to the target box, and execute it.
+  _bc_ssh_args='-q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ControlPath=~/.ssh/%r@%h:%p -o ControlMaster=auto -o ControlPersist=10m'
+  _bc_rpath="/root/boxconf-$(date +%Y%m%d%H%M%S)"
+
+  _boxconf_cleanup(){
+    ssh $_bc_ssh_args "root@${_bc_target}" -- rm -rf "${_bc_rpath}"
+  }
+
+  # Create the boxconf directory on the target host.
+  ssh $_bc_ssh_args "root@${_bc_target}" -- install -d -m 700 "$_bc_rpath"
+
+  # Make sure the remote directory is removed if the parent process dies unexpectedly.
+  trap _boxconf_cleanup HUP INT QUIT TERM EXIT
+
+  # Send the boxconf tarball to the target host, and extract it.
+  tar -C "$BOXCONF_ROOT" -czf - ./ \
+    | ssh $_bc_ssh_args "root@${_bc_target}" -- tar -xzf - -C "${_bc_rpath}" $(printf -- '--exclude %s ' $_BOXCONF_TARBALL_EXCLUDE)
+
+  # Run boxconf on the target host.
+  ssh $_bc_ssh_args "root@${_bc_target}" -- "${_bc_rpath}/boxconf" "$@" localhost && _bc_rc=$? || _bc_rc=$?
+
+  [ "$_bc_rc" -ne 0 ] && echo "EXIT STATUS ${_bc_rc}" 1>&2
+  exit "$_bc_rc"
+fi

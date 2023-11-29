@@ -1,0 +1,74 @@
+#!/bin/sh
+
+# repo.crt and repo.key should be generated in the boxconf repo like so:
+#   openssl genrsa -out files/usr/local/etc/ssl/repo.key 4096
+#   openssl rsa -in files/usr/local/etc/ssl/repo.key -pubout -out files/usr/local/etc/ssl/repo.crt
+#   ./vault encrypt files/usr/local/etc/ssl/repo.key
+
+: ${poudriere_versions:='13.2-RELEASE'}
+: ${poudriere_jobs:="$(nproc)"}
+: ${poudriere_dataset:="${state_dataset:-zroot}"}
+
+poudriere_data_dir=/usr/local/poudriere
+poudriere_conf_dir=/usr/local/etc/poudriere.d
+
+# These packages are needed to bootstrap poudriere. On the first run, they'll
+# be installed from the public FreeBSD repos.
+pkg install -y \
+  poudriere    \
+  git-lite     \
+  nginx
+
+# Generate poudriere configuration.
+install_template -m 0644 /usr/local/etc/poudriere.conf
+install_file -m 0400 /usr/local/etc/ssl/repo.key
+install_file -m 0644 "${poudriere_conf_dir}/make.conf" "${poudriere_conf_dir}/pkglist"
+install_directory -m 0755 /usr/ports/distfiles
+
+# Configure and enable nginx to serve the packages.
+install_template -m 0644 /usr/local/etc/nginx/nginx.conf
+sysrc -v nginx_enable=YES
+service nginx restart
+
+# Create and update the `latest` ports tree.
+[ -d "${poudriere_data_dir}/ports/latest" ] || poudriere ports -c -v -p latest
+poudriere ports -v -u -p latest
+
+# Since we're doing a ton of compilation, disable sync on the poudriere dataset.
+# Possibly snakeoil, but my hope is that most file I/O will end up in the ARC cache
+# and not thrash the disks.
+zfs set sync=disabled "${poudriere_dataset}/poudriere"
+
+# For each specified FreeBSD version, build all packages.
+for version in $poudriere_versions; do
+  jail=$(echo "$version" | tr . _)
+  abi="FreeBSD:${version%%.*}:$(uname -p)"
+
+  [ -d "${poudriere_data_dir}/jails/${jail}" ] || poudriere jail -c -j "$jail" -v "$version"
+  poudriere jail -u -j "$jail"
+  poudriere bulk -v -j "$jail" -f ${poudriere_conf_dir}/pkglist -p latest
+
+  install_directory -m 0755 "${poudriere_data_dir}/data/packages/${abi}"
+  ln -snfv "../${jail}-latest" "${poudriere_data_dir}/data/packages/${abi}/latest"
+done
+
+# Add an empty directory named "poudriere" in the webroot, just so we can easily
+# click on something in the autoindex page that takes us to the Poudriere interface.
+install_directory -m 0555 "${poudriere_data_dir}/data/packages/poudriere"
+
+# Create cron job to update packages automatically.
+install_file -m 0555 /usr/local/sbin/poudriere-cron
+echo "@daily root lockf -t 0 /tmp/poudriere-cron.lock poudriere-cron $(echo "$poudriere_versions" | tr . _)" \
+  | tee /etc/cron.d/poudriere
+
+# Now that we have a valid repo, switch the pkg repo to the local filesystem.
+install_directory -m 0755  \
+  /usr/local/etc/pkg       \
+  /usr/local/etc/pkg/repos
+
+install_file     -m 0644 /usr/local/etc/pkg/repos/FreeBSD.conf
+install_template -m 0644 /usr/local/etc/pkg/repos/internal.conf
+
+# Install default packages (now that they've been built).
+pkg update -f
+pkg install $install_packages

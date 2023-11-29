@@ -1,0 +1,11 @@
+#!/bin/sh
+
+[ -n "${state_dataset:-}" ] || die '$state_dataset not defined!'
+
+# Make sure the state dataset exists.
+create_dataset "$state_dataset"
+
+# If this is baremetal host or a VM, trim the zpools periodically.
+if [ "$BOXCONF_VIRTUALIZATION_TYPE" != jail ]; then
+  install_file -m 0644 /etc/cron.d/zfs-trim
+fi

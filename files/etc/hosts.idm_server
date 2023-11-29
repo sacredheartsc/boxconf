@@ -1,0 +1,10 @@
+::1        localhost  localhost.${domain}
+127.0.0.1  localhost  localhost.${domain}
+
+# Note the trailing dot. Turns out Heimdal KRB5 is insane and appends the '.' to
+# all hostname queries (?!)
+${BOXCONF_DEFAULT_IPV4}  ${BOXCONF_HOSTNAME}.${domain} ${BOXCONF_HOSTNAME}.${domain}.  ${BOXCONF_HOSTNAME}
+
+# Set the IP address of the pkg server here, in case the IDM services
+# haven't been configured yet.
+${pkg_host_ipv4}  ${pkg_host}

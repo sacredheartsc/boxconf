@@ -1,0 +1,33 @@
+#!/bin/sh
+
+# Host object for *this* IDM server.
+ldap_add "dc=${BOXCONF_HOSTNAME},${hosts_basedn}" <<EOF
+objectClass: dNSDomain2
+objectClass: domainRelatedObject
+objectClass: ldapPublicKey
+objectClass: krb5KDCEntry
+cn: ${BOXCONF_HOSTNAME}
+associatedDomain: ${fqdn}
+associatedDomain: $(ip2rdns "$BOXCONF_DEFAULT_IPV4")
+aRecord: ${BOXCONF_DEFAULT_IPV4}
+pTRRecord: ${fqdn}
+krb5PrincipalName: host/${fqdn}@${realm}
+krb5KeyVersionNumber: 0
+krb5KDCFlags: ${kdc_default_princ_flags}
+krb5MaxLife: ${kdc_max_ticket_lifetime}
+krb5MaxRenew: ${kdc_max_renew_lifetime}
+$(cat /etc/ssh/ssh_host_*_key.pub | cut -d' ' -f-2 | sed 's/^/sshPublicKey: /')
+EOF
+
+# LDAP service principal for slapd.
+ldap_add "cn=ldap/${fqdn},${services_basedn}" <<EOF
+objectClass: applicationProcess
+objectClass: krb5Principal
+objectClass: krb5KDCEntry
+cn: ldap/${fqdn}
+krb5PrincipalName: ldap/${fqdn}@${realm}
+krb5KeyVersionNumber: 0
+krb5KDCFlags: ${kdc_default_princ_flags}
+krb5MaxLife: ${kdc_max_ticket_lifetime}
+krb5MaxRenew: ${kdc_max_renew_lifetime}
+EOF

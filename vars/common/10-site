@@ -1,0 +1,18 @@
+#!/bin/sh
+
+organization='SacredHeartSC Test Environment'
+domain=test.sacredheartsc.com
+locale=en_US.UTF-8
+timezone=America/New_York
+root_authorized_keys='ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICy6mAAeVe2eo5j/d+vLOATvLCOTvp2BMjI9aeW7KcwI'
+pkg_host_ipv4='10.11.199.4'
+
+idm_servers='idm1 idm2'
+slapd_server_ids="\
+1 10.11.199.2
+2 10.11.199.3"
+
+reverse_dns_zones="\
+130.11.10.in-addr.arpa
+199.11.10.in-addr.arpa
+"

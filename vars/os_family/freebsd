@@ -1,0 +1,39 @@
+#!/bin/sh
+
+enable_pf=true
+allow_wx=0
+cx_lowest=Cmax
+ca_cert=/usr/local/etc/ssl/certs/ca.crt
+pkg_host="pkg.${domain}"
+keytab_dir=/var/db/keytabs
+ssh_host_key_dir=/var/db/ssh
+nslcd_user=nslcd
+
+# pkg needs this or else it tries to prompt.
+export ASSUME_ALWAYS_YES=yes
+
+# Packages that get installed on every host.
+install_packages="\
+sudo
+tmux
+vim
+"
+
+# suitable for 10 GigE
+ifconfig | grep -q '10Gbase-T' && tcp_buffer_size=16777216
+
+case $BOXCONF_VIRTUALIZATION_TYPE in
+  jail)
+    # For jails, assume the state dataset is the one delegated to the jail
+    # and named "data".
+    state_dataset=$(zfs list -Ho jailed,name | awk '$1 == "on" && $2 ~ /\/data$/ {print $2;exit}')
+    ;;
+  *)
+    # Otherwise, assume the state dataset is on the same zpool as the root
+    # filesystem and named "data".
+    state_dataset=$(zfs list -Ho name,mountpoint | awk '$2 == "/" {print $1;exit}' | cut -d/ -f1)
+    state_dataset=${state_dataset:+${state_dataset}/data}
+    ;;
+esac
+
+# vi: ft=sh

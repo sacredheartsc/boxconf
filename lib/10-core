@@ -1,0 +1,179 @@
+#!/bin/sh
+
+BOXCONF_SCRIPT_DIR="${BOXCONF_ROOT}/scripts"
+BOXCONF_VAR_DIR="${BOXCONF_ROOT}/vars"
+BOXCONF_FILE_DIR="${BOXCONF_ROOT}/files"
+BOXCONF_CA_DIR="${BOXCONF_ROOT}/ca"
+BOXCONF_VAULT_PASSWORD_FILE="${BOXCONF_ROOT}/.vault_password"
+BOXCONF_VAULT_CIPHER=aes256
+
+log(){
+  printf '%s: %s\n' "$PROGNAME" "$1" 1>&2
+}
+
+debug(){
+  printf '%s: DEBUG: %s\n' "$PROGNAME" "$1" 1>&2
+}
+
+warn(){
+  printf '%s: WARNING: %s\n' "$PROGNAME" "$1" 1>&2
+}
+
+bug(){
+  printf '%s: BUG: %s\n' "$PROGNAME" "$1" 1>&2
+  exit 255
+}
+
+read_password(){
+  if [ -t 0 ]; then
+    _bcrp_stty=$(stty -g)
+    stty -echo
+  fi
+
+  printf '%s ' "$1" 1>&2
+  read -r "$2"
+
+  if [ -t 0 ]; then
+    stty "$_bcrp_stty"
+    echo
+  fi
+}
+
+_boxconf_get_vault_password(){
+  if [ -z "${BOXCONF_VAULT_PASSWORD:-}" ]; then
+    if [ -f "${BOXCONF_VAULT_PASSWORD_FILE}" ]; then
+      BOXCONF_VAULT_PASSWORD=$(cat "${BOXCONF_VAULT_PASSWORD_FILE}")
+    else
+      read_password 'Enter vault password:' BOXCONF_VAULT_PASSWORD
+    fi
+  fi
+}
+
+_boxconf_decrypt(){
+  # $1=infile, $2=outfile
+  _boxconf_get_vault_password
+
+  if [ $# -gt 1 ]; then
+    PASS=$BOXCONF_VAULT_PASSWORD openssl enc -in "$1" -out "$2" -d "-${BOXCONF_VAULT_CIPHER}" -pass env:PASS -pbkdf2
+  else
+    PASS=$BOXCONF_VAULT_PASSWORD openssl enc -in "$1" -d "-${BOXCONF_VAULT_CIPHER}" -pass env:PASS -pbkdf2
+  fi
+}
+
+_boxconf_is_encrypted(){
+  head -n1 "$1" | grep -q '^Salted__'
+}
+
+_boxconf_source_file(){
+  if _boxconf_is_encrypted "$1"; then
+    _boxconf_decrypt "$1" "${1}.plaintext"
+    . "${1}.plaintext"
+  else
+    . "$1"
+  fi
+}
+
+_boxconf_include(){
+  while [ $# -gt 0 ]; do
+    if [ -f "$1" ]; then
+      # If path is a file, source it.
+      BOXCONF_SOURCE=$1
+      _boxconf_source_file "$BOXCONF_SOURCE"
+    elif [ -d "$1" ]; then
+      # If path is a directory, source all its files in glob order.
+      for _bci_file in "$1"/*; do
+        if [ -f "$_bci_file" ]; then
+          BOXCONF_SOURCE=$_bci_file
+          _boxconf_source_file "$BOXCONF_SOURCE"
+        fi
+      done
+    fi
+    shift
+  done
+}
+
+_boxconf_run(){
+  # Determine OS family.
+  case "$(uname)" in
+    Linux)
+      BOXCONF_OS_FAMILY=linux
+      ;;
+    FreeBSD)
+      BOXCONF_OS_FAMILY=freebsd
+      ;;
+    *)
+      die "unsupported os family: $(uname)"
+      ;;
+  esac
+
+  # Determine default interface and IPv4 address.
+  case $BOXCONF_OS_FAMILY in
+    freebsd)
+      BOXCONF_DEFAULT_INTERFACE=$(route -4n get default | awk '$1 == "interface:" { print $2 }')
+      BOXCONF_DEFAULT_IPV4=$(ifconfig "$BOXCONF_DEFAULT_INTERFACE" | awk '$1 == "inet" { print $2 }')
+      ;;
+    linux)
+      BOXCONF_DEFAULT_INTERFACE=$(ip -4 -o route get to 1 | awk '{print $5}')
+      BOXCONF_DEFAULT_IPV4=$(ip -4 -o route get to 1 | awk '{print $7}')
+      ;;
+  esac
+
+  # Determine OS distribution.
+  if [ -f /etc/os-release ]; then
+    BOXCONF_OS_DISTRIBUTION=$(. /etc/os-release; printf '%s' "$ID")
+    BOXCONF_OS_VERSION=$(. /etc/os-release; printf '%s' "$VERSION")
+  else
+    die 'unknown os distribution'
+  fi
+
+  case $BOXCONF_OS_DISTRIBUTION in
+    freebsd|debian) : ;; # supported
+    *) die "unsupported os distribution: ${BOXCONF_OS_DISTRIBUTION}" ;;
+  esac
+
+  # Determine virtualization type.
+  BOXCONF_VIRTUALIZATION_TYPE=none
+  case $BOXCONF_OS_FAMILY in
+    linux)
+      grep -q '^flags.* hypervisor' /proc/cpuinfo && BOXCONF_VIRTUALIZATION_TYPE=vm
+      ;;
+    freebsd)
+      if [ "$(sysctl -n security.jail.jailed)" = 1 ]; then
+        BOXCONF_VIRTUALIZATION_TYPE=jail
+      elif [ -n "$(sysctl -n hw.hv_vendor)" ]; then
+        BOXCONF_VIRTUALIZATION_TYPE=vm
+      fi
+      ;;
+  esac
+
+  # Determine hostname.
+  : "${BOXCONF_HOSTNAME:=$(hostname -s)}"
+
+  # Determine hostclass.
+  BOXCONF_HOSTCLASS=undefined
+  while read -r _bcc_hostclass _bcc_regex; do
+    if printf '%s\n' "$BOXCONF_HOSTNAME" | grep -Eq "$_bcc_regex"; then
+      BOXCONF_HOSTCLASS=$_bcc_hostclass
+      break
+    fi
+  done < "${BOXCONF_ROOT}/hostclasses"
+
+  [ "$BOXCONF_HOSTCLASS" = undefined ] && warn 'unable to determine hostclass'
+
+  _boxconf_include                                                     \
+    "${BOXCONF_VAR_DIR}/common"                                        \
+    "${BOXCONF_VAR_DIR}/os_family/${BOXCONF_OS_FAMILY}"                \
+    "${BOXCONF_VAR_DIR}/os_distribution/${BOXCONF_OS_DISTRIBUTION}"    \
+    "${BOXCONF_VAR_DIR}/hostclass/${BOXCONF_HOSTCLASS}"                \
+    "${BOXCONF_VAR_DIR}/hostname/${BOXCONF_HOSTNAME}"                  \
+    "${BOXCONF_SCRIPT_DIR}/common"                                     \
+    "${BOXCONF_SCRIPT_DIR}/os_family/${BOXCONF_OS_FAMILY}"             \
+    "${BOXCONF_SCRIPT_DIR}/os_distribution/${BOXCONF_OS_DISTRIBUTION}" \
+    "${BOXCONF_SCRIPT_DIR}/hostclass/${BOXCONF_HOSTCLASS}"             \
+    "${BOXCONF_SCRIPT_DIR}/hostname/${BOXCONF_HOSTNAME}"
+
+  if [ "${BOXCONF_NEED_REBOOT:-}" = true ]; then
+    log '$BOXCONF_NEED_REBOOT was set. Rebooting host...'
+    reboot
+  fi
+}

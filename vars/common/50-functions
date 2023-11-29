@@ -1,0 +1,62 @@
+#!/bin/sh
+
+###############################################################################
+## Kerberos / LDAP related functions.
+##
+## These functions allow the $boxconf_user to obtain Kerberos credential caches
+## and perform LDAP queries.
+##
+## - $boxconf_user, $boxconf_password, and $realm must be set.
+## - Only Heimdal KRB5 is supported.
+## - Appropriate krb5.conf and ldap.conf must exist on the host.
+###############################################################################
+
+boxconf_ccache='/tmp/krb5cc_boxconf'
+boxconf_test_ccache='/tmp/krb5cc_boxconf_test'
+
+BOXCONF_CLEANUP_PATHS="${BOXCONF_CLEANUP_PATHS} ${boxconf_ccache} ${boxconf_test_ccache}"
+
+boxconf_kinit(){
+  klist -c "$boxconf_ccache" -t \
+    || printf '%s' "$boxconf_password" \
+      | kinit -c "$boxconf_ccache" --password-file=STDIN "${boxconf_user}@${realm}"
+}
+
+get_keytab(){
+  # $1 = keytab, $2 = princ
+  # If the keytab exists, check if kinit succeeds with the given principal.
+  [ -f "$1" ] && kinit -c "$boxconf_test_ccache" -t "$1" "$2" true && return 0
+
+  # If not, reset the keys.
+  printf '%s' "$boxconf_password" \
+    | kinit -c "$boxconf_ccache" -S "kadmin/admin@${realm}" --password-file=STDIN "${boxconf_user}@${realm}" \
+      && KRB5CCNAME="$boxconf_ccache" ktutil -v -k "$1" get -p "${boxconf_user}@${realm}" "${2}@${realm}"
+}
+
+boxconf_kadmin(){
+  printf '%s' "$boxconf_password" \
+    | boxconf_kinit -c "$boxconf_ccache" -S "kadmin/admin@${realm}" --password-file=STDIN "${boxconf_user}@${realm}" \
+      && KRB5CCNAME="$boxconf_ccache" kadmin -r "$realm" -p "${boxconf_user}@${realm}" "$@"
+}
+
+ldap_search(){
+  boxconf_kinit && KRB5CCNAME="$boxconf_ccache" ldapsearch -QLLL "$@"
+}
+
+ldap_add(){
+  _ldapa_dn=$1; shift
+  boxconf_kinit \
+    && KRB5CCNAME="$boxconf_ccache" ldapsearch -QLLL -s base -b "$_ldapa_dn" dn > /dev/null 2>&1 \
+    || { printf 'dn: %s\n' "$_ldapa_dn"; cat; } | KRB5CCNAME="$boxconf_ccache" ldapadd -Q "$@"
+}
+
+ldap_modify(){
+  _ldapm_dn=$1; shift
+  boxconf_kinit \
+    && { printf 'dn: %s\nchangetype: modify\n' "$_ldapm_dn"; cat; } \
+      | KRB5CCNAME="$boxconf_ccache" ldapmodify -Q "$@"
+}
+
+ldap_delete(){
+  boxconf_kinit && KRB5CCNAME="$boxconf_ccache" ldapdelete -Q "$@"
+}

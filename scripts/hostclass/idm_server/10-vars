@@ -1,0 +1,83 @@
+#!/bin/sh
+
+: ${idm_admin_group:='sysadmins'}
+: ${idm_admin_gid:='30000'}
+: ${boxconf_uid='20000'}
+: ${slapd_result_size_limit:='10000'}
+: ${slapd_db_max_size:='1073741824'} # 1 GB
+: ${slapd_accesslog_db_max_size:='134217728'} # 128 MB
+: ${slapd_syncrepl_checkpoint_ops:='100'}
+: ${slapd_syncrepl_checkpoint_minutes:='10'}
+: ${slapd_syncrepl_session_log:='1000'}
+: ${slapd_syncrepl_cleanup_age:='7'}
+: ${slapd_syncrepl_cleanup_interval:='1'}
+: ${slapd_root_dn:='cn=admin'}
+: ${slapd_replicator_dn:="cn=replicator,${basedn}"}
+: ${kdc_admin_princs:=''}
+: ${kdc_max_ticket_lifetime:='86400'} # 1 day
+: ${kdc_max_renew_lifetime:='604800'} # 1 week
+: ${kdc_num_processes:="$(nproc)"}
+: ${kdc_password_min_classes:='2'}
+: ${kdc_password_min_length:='10'}
+: ${pdns_port:='1053'}
+: ${pdns_distributor_threads:='3'}
+: ${pdns_receiver_threads:="$(nproc)"}
+: ${pdns_allow_axfr_ips:='127.0.0.1/8'}
+: ${pdns_cache_ttl:='30'}
+: ${pdns_query_cache_ttl:='20'}
+: ${pdns_negquery_cache_ttl:='60'}
+: ${unbound_threads:="$(nproc)"}
+: ${unbound_cache_max_negative_ttl:='60'}
+: ${unbound_rrset_cache_size:='104857600'} # 100 MB
+: ${unbound_msg_cache_size:='52428800'} # 50 MB
+: ${unbound_slabs:='2'}
+: ${unbound_insecure_domains:=''}
+: ${unbound_local_zones:=''}
+: ${unbound_local_data:=''}
+: ${unbound_blocklists:=''}
+: ${nslcd_min_uid='1000'}
+: ${nscd_ttl='600'}
+: ${nscd_negative_ttl='20'}
+
+idm_primary_server=$(echo "$slapd_server_ids" | awk 'NR==1{print $2}')
+boxconf_princ_flags=334 # disallow-svr,requires-pre-auth,disallow-postdated
+boxconf_ticket_lifetime=300 # 5 min
+boxconf_renew_lifetime=900 # 15 min
+slapd_conf_dir=/usr/local/etc/openldap
+slapd_data_dir=/var/db/openldap-data
+slapd_keytab="${keytab_dir}/slapd.keytab"
+slapd_user=ldap
+slapd_tls_cert="${slapd_conf_dir}/slapd.crt"
+slapd_tls_key="${slapd_conf_dir}/slapd.key"
+slapd_replicator_tls_cert="${slapd_conf_dir}/replicator.crt"
+slapd_replicator_tls_key="${slapd_conf_dir}/replicator.key"
+saslauthd_runtime_dir=/var/run/saslauthd
+saslauthd_user=cyrus
+kdc_conf_dir=/var/heimdal
+kdc_basedn="ou=kdc,${accounts_basedn}"
+kdc_default_princ_flags=382 # requires-pre-auth
+pdns_conf_dir=/usr/local/etc/pdns
+pdns_runtime_dir=/var/run/pdns
+pdns_soa_record="sOARecord: ${fqdn} root.${domain} 0 10800 3600 604800 3600"
+pdns_ns_records=$(printf "nSRecord: %s.${domain}\n" $idm_servers)
+pdns_user=pdns
+pdns_keytab="${keytab_dir}/pdns.keytab"
+unbound_conf_dir=/usr/local/etc/unbound
+unbound_blocklist_dir="${unbound_conf_dir}/blocklists"
+unbound_blocklist_file="${unbound_conf_dir}/blocklists.txt"
+
+rdn(){
+  echo "$1" | sed -E 's/^[^=]+=([^,]+),.*$/\1/'
+}
+
+kadmin(){
+  /usr/local/bin/kadmin -l -r "$realm" "$@"
+}
+
+dn_exists(){
+  command ldapsearch -QLLL -H ldapi:/// -Y EXTERNAL -s base -b "$1" dn > /dev/null 2>&1
+}
+
+ldap_add(){
+  dn_exists "$1" || { printf 'dn: %s\n' "$1"; cat; } | ldapadd -Q -H ldapi:/// -Y EXTERNAL
+}

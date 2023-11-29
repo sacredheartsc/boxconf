@@ -1,0 +1,5 @@
+internal: {
+  enabled: yes,
+  url: "file://${poudriere_data_dir}/data/packages/\${ABI}/latest",
+  signature_type: "none",
+}

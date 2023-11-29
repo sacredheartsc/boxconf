@@ -1,0 +1,12 @@
+[ req ]
+req_extensions = v3_req
+distinguished_name = req_distinguished_name
+prompt = no
+
+[ v3_req ]
+basicConstraints = critical,CA:FALSE
+extendedKeyUsage = serverAuth
+subjectAltName = DNS:idm1.test.sacredheartsc.com,IP:10.11.199.2,DNS:test.sacredheartsc.com
+
+[ req_distinguished_name ]
+CN = idm1.test.sacredheartsc.com

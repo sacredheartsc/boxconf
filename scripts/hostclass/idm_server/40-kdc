@@ -1,0 +1,39 @@
+#!/bin/sh
+
+pkg install -y heimdal
+
+# Generate the system kerberos configuration.
+install_template -m 0644 /etc/krb5.conf
+ln -snfv /etc/krb5.conf /usr/local/etc/krb5.conf
+
+# Copy required files for the KDC. m-key is the master encryption key for all
+# kerberos principals. Be careful with it!
+install_template -m 0644 "${kdc_conf_dir}/kdc.conf"
+install_template -m 0600 "${kdc_conf_dir}/kadmind.acl"
+install_file     -m 0600 "${kdc_conf_dir}/m-key"
+
+# If the krbtgt LDAP entry doesn't exist, we need to initialize the kerberos realm.
+if [ "${BOXCONF_DEFAULT_IPV4}" = "${idm_primary_server}" ] \
+  && ! dn_exists "krb5PrincipalName=krbtgt/${realm}@${realm},${kdc_basedn}"
+then
+  kadmin init \
+    --realm-max-ticket-life="${kdc_max_ticket_lifetime} seconds"   \
+    --realm-max-renewable-life="${kdc_max_renew_lifetime} seconds" \
+    "$realm"
+fi
+
+# Enable kdc, kadmind, and kpasswdd in /etc/rc.conf, and start them.
+sysrc -v                                                                                   \
+  kdc_program=/usr/local/libexec/kdc                                                       \
+  kadmind_program=/usr/local/libexec/kadmind                                               \
+  kpasswdd_program=/usr/local/libexec/kpasswdd                                             \
+  kdc_flags="-c ${kdc_conf_dir}/kdc.conf"                                                  \
+  kadmind_flags="-c ${kdc_conf_dir}/kdc.conf --keytab=HDBGET:ldap:${kdc_basedn} --detach"  \
+  kpasswdd_flags="-c ${kdc_conf_dir}/kdc.conf --keytab=HDBGET:ldap:${kdc_basedn} --detach" \
+  kdc_enable=YES                                                                           \
+  kadmind_enable=YES                                                                       \
+  kpasswdd_enable=YES
+
+service kdc restart
+service kadmind restart
+service kpasswdd restart

@@ -1,0 +1,15 @@
+#!/bin/sh
+
+sysrc -v \
+  defaultrouter=10.11.130.1 \
+  ifconfig_ixl0=up \
+  ifconfig_ixl1=up \
+  cloned_interfaces+="lagg0 vlan130 bridge130" \
+  ifconfig_lagg0="laggproto lacp laggport ixl0 laggport ixl1 lagghash l3,l4" \
+  ifconfig_vlan130="vlan 130 vlandev lagg0" \
+  ifconfig_bridge130="inet 10.11.130.23 netmask 255.255.255.0 addm vlan130" \
+
+# iDRAC console settings
+set_loader_conf \
+  comconsole_speed=115200 \
+  comconsole_port=0x2f8

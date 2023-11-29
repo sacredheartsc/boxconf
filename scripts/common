@@ -1,0 +1,13 @@
+#!/bin/sh
+
+# Add root SSH pubkeys.
+install_directory -m 700 /root/.ssh
+printf '%s\n' "$root_authorized_keys" | tee /root/.ssh/authorized_keys
+
+# Set root password.
+printf '%s\n%s\n' "$root_password" "$root_password" | passwd
+
+# Set DNS resolvers.
+# NB: For IDM servers, the resolver is localhost. In that case, we delay copying
+# this file until the IDM stack is fully up and running.
+[ "$BOXCONF_HOSTCLASS" = idm_server ] || install_template -m 0644 /etc/resolv.conf

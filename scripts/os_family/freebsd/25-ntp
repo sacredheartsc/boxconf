@@ -1,0 +1,13 @@
+#!/bin/sh
+
+# Only run this script on baremetal hosts and VMs.
+# Jails will use the clock of their host.
+[ "$BOXCONF_VIRTUALIZATION_TYPE" = jail ] && return 0
+
+install_template -m 0644 /etc/ntp.conf
+
+sysrc -v                 \
+  ntpd_enable=YES        \
+  ntpd_sync_on_start=YES
+
+service ntpd restart

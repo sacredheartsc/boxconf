@@ -1,0 +1,75 @@
+#!/bin/sh
+
+pkg install -y         \
+  openldap26-server    \
+  cyrus-sasl-saslauthd
+
+# Create ZFS dataset for OpenLDAP DB.
+create_dataset -o "mountpoint=${slapd_data_dir}" "${state_dataset}/openldap-data"
+
+# First, a bit of a hack. We have to change the home directory of the slapd user, so
+# that we can create a ~/.krb5/config file, so that we can specify the correct keytab.
+# Turns out Heimdal refuses to obey KRB5_KTNAME when it believes a setuid binary
+# is calling the GSS functions (and it's often incorrect).
+pw user mod "$slapd_user" -d "$slapd_conf_dir"
+install_directory -m 0755 "${slapd_conf_dir}/.krb5"
+install_template -m 0644 "${slapd_conf_dir}/.krb5/config"
+
+# Copy TLS certificate for LDAP server.
+install_certificate     -o "$slapd_user" -g "$slapd_user" "$fqdn" "$slapd_tls_cert"
+install_certificate_key -o "$slapd_user" -g "$slapd_user" "$fqdn" "$slapd_tls_key"
+
+# Copy client certificate for LDAP replication.
+install_certificate     -o "$slapd_user" -g "$slapd_user" "$slapd_replicator_dn" "$slapd_replicator_tls_cert"
+install_certificate_key -o "$slapd_user" -g "$slapd_user" "$slapd_replicator_dn" "$slapd_replicator_tls_key"
+
+# Copy LDIF for the cn=config database.
+install_template -m 0600 "${slapd_conf_dir}/slapd.ldif"
+
+# Copy third-party schema files.
+install_file -m 0644 \
+  "${slapd_conf_dir}/schema/rfc2307bis.ldif"  \
+  "${slapd_conf_dir}/schema/heimdal.ldif"     \
+  "${slapd_conf_dir}/schema/openssh-lpk.ldif" \
+  "${slapd_conf_dir}/schema/sudo.ldif"        \
+  "${slapd_conf_dir}/schema/dnsdomain2.ldif"
+
+# Create the directories for the LDAP databases.
+install_directory -m 0770 -o "$slapd_user" -g "$slapd_user" \
+  "${slapd_data_dir}"                                       \
+  "${slapd_data_dir}/accesslog"
+
+# If slapd.d doesn't exist, populate it with slapd.ldif.
+if [ ! -d "${slapd_conf_dir}/slapd.d" ]; then
+  install_directory -m 0700 -o "$slapd_user" "${slapd_conf_dir}/slapd.d"
+  slapadd -v -n0 -F "${slapd_conf_dir}/slapd.d" -l "${slapd_conf_dir}/slapd.ldif"
+  chown -R "${slapd_user}:${slapd_user}" "${slapd_conf_dir}/slapd.d"
+fi
+
+# Enable OpenLDAP in /etc/rc.conf, and start it.
+# Note: whatever LDAP IP you specified in $slapd_server_ids must be present in the
+# `-h` argument to slapd. That's how slapd figures out its own server ID.
+sysrc -v \
+  slapd_enable=YES \
+  slapd_cn_config=YES \
+  slapd_flags="-h 'ldapi://%2fvar%2frun%2fopenldap%2fldapi/ ldap://0.0.0.0/ ldaps://0.0.0.0/ ldaps://${BOXCONF_DEFAULT_IPV4}/'" \
+  slapd_sockets="/var/run/openldap/ldapi" \
+  slapd_krb5_ktname="$slapd_keytab"
+
+service slapd restart
+
+# Copy the LDAP client configs.
+install_template -m 0644 "${slapd_conf_dir}/ldap.conf"
+
+# Copy slapd SASL configuration.
+install_template -m 0644 /usr/local/lib/sasl2/slapd.conf
+
+# Allow slapd to read the saslauthd socket.
+install_directory -m 0750 -o "$saslauthd_user" -g "$slapd_user" "$saslauthd_runtime_dir"
+
+# Enable and start saslauthd.
+sysrc -v                         \
+  saslauthd_flags='-a kerberos5' \
+  saslauthd_enable=YES
+
+service saslauthd restart

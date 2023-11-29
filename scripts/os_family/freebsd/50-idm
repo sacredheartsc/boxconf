@@ -1,0 +1,91 @@
+#!/bin/sh
+
+# The IDM server is also technically an IDM client (of itself), but if-elsing all
+# the special cases required for that logic would be gross.  Therefore, for IDM
+# servers, we skip this file and do everything in the hostclass script.
+case $BOXCONF_HOSTCLASS in
+  idm_server|freebsd_hypervisor) return 0 ;;
+esac
+
+[ -n "${no_idm:-}" ] && return 0
+
+# Create state dataset to persist keytabs across OS rebuilds.
+create_dataset -o "mountpoint=${keytab_dir}" "${state_dataset}/keytabs"
+
+# Install packages.
+pkg install -y          \
+  cyrus-sasl-gssapi     \
+  kstart                \
+  nss-pam-ldapd-sasl    \
+  openldap26-client     \
+  pam_krb5-heimdal_base
+
+install_file -m 0644 \
+  /etc/nsswitch.conf \
+  /etc/pam.d/sshd    \
+  /etc/pam.d/system
+
+install_template -m 0644             \
+  /etc/krb5.conf                     \
+  /etc/nscd.conf                     \
+  /usr/local/etc/openldap/ldap.conf  \
+  /usr/local/etc/nslcd.conf
+
+ln -snfv /usr/local/etc/openldap/ldap.conf /usr/local/etc/ldap.conf
+
+# Create host object (if it doesn't exist).
+# NB: Stuffing the PTR and A record into the same object allows some bogus
+#     DNS queries to succeed. For example, you can query the in-addr.arpa
+#     record as an A record (rather than PTR) and you'll get the FQDN back.
+#
+#     I'm leaving this as is, because this seems ~fine for internal stuff, and
+#     it's very convenient to have all the related DNS bits in the host entry.
+ldap_add "dc=${BOXCONF_HOSTNAME},${hosts_basedn}" <<EOF
+objectClass: dNSDomain2
+objectClass: domainRelatedObject
+objectClass: ldapPublicKey
+objectClass: krb5KDCEntry
+cn: ${BOXCONF_HOSTNAME}
+$(printf "associatedDomain: %s.${domain}\n" "$BOXCONF_HOSTNAME" ${cnames:-})
+associatedDomain: $(ip2rdns "$BOXCONF_DEFAULT_IPV4")
+aRecord: ${BOXCONF_DEFAULT_IPV4}
+pTRRecord: ${fqdn}
+krb5PrincipalName: host/${fqdn}@${realm}
+krb5KeyVersionNumber: 0
+krb5KDCFlags: ${krb5_host_princ_flags}
+krb5MaxLife: ${krb5_max_ticket_lifetime}
+krb5MaxRenew: ${krb5_max_renew_lifetime}
+$(cat /etc/ssh/ssh_host_*_key.pub | cut -d' ' -f-2 | sed 's/^/sshPublicKey: /')
+description: $(uname -mrs) ${BOXCONF_HOSTCLASS}
+EOF
+
+# Update attributes that may have changed.
+ldap_modify "dc=${BOXCONF_HOSTNAME},${hosts_basedn}" <<EOF
+replace: sshPublicKey
+$(cat /etc/ssh/ssh_host_*_key.pub | cut -d' ' -f-2 | sed 's/^/sshPublicKey: /')
+-
+replace: description
+description: $(uname -mrs) ${BOXCONF_HOSTCLASS}
+-
+replace: associatedDomain
+$(printf "associatedDomain: %s.${domain}\n" "$BOXCONF_HOSTNAME" ${cnames:-})
+associatedDomain: $(ip2rdns "$BOXCONF_DEFAULT_IPV4")
+EOF
+
+# Create host keytab.
+get_keytab "${keytab_dir}/host.keytab" "host/${fqdn}"
+ln -snfv "${keytab_dir}/host.keytab" /etc/krb5.keytab
+
+sysrc -v                                                          \
+  kstart_instances+='system nslcd'                                \
+  kstart_system_keytab='/etc/krb5.keytab'                         \
+  kstart_system_flags="-aLK 120 -k /tmp/krb5cc_0 -u host/${fqdn}" \
+  kstart_nslcd_keytab='/etc/krb5.keytab'                          \
+  kstart_nslcd_flags="-aLK 120 -g ${nslcd_user} -o ${nslcd_user} -k /tmp/krb5cc_$(id -u "$nslcd_user") -u host/${fqdn}" \
+  kstart_enable=YES                                               \
+  nslcd_enable=YES                                                \
+  nscd_enable=YES
+
+service kstart restart
+service nslcd restart
+service nscd restart

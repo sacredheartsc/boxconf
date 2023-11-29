@@ -1,0 +1,55 @@
+#!/bin/sh
+
+vm_home=/usr/local/bhyve
+vm_dataset=tank/bhyve
+jail_home=/usr/local/jails
+jail_dataset=tank/jails
+
+# Required for vnet jails.
+set_sysctl net.link.tap.up_on_open=1
+
+# Load required kernel modules.
+load_kernel_module vmm nmdm
+set_loader_conf       \
+  vmm_load=YES        \
+  nmdm_load=YES       \
+  kern.racct.enable=1
+
+# Install pkg dependencies.
+pkg install -y       \
+  bhyve-firmware     \
+  cdrkit-genisoimage \
+  qemu-tools
+
+# Create bhyve VM dataset.
+create_dataset -o "mountpoint=${vm_home}" "$vm_dataset"
+
+# Create dataset for bhyve templates.
+create_dataset -o volmode=none -o mountpoint=none "${vm_dataset}/templates"
+
+# Create jails dataset.
+create_dataset -o mountpoint="${jail_home}" "$jail_dataset"
+
+# Create dataset for jail templates.
+create_dataset -o mountpoint="${jail_home}/templates" "${jail_dataset}/templates"
+
+# Lock down permissions on the VM and jail directories.
+chmod 700 "$vm_home" "$jail_home"
+
+# Create directory for VM ISO files.
+install_directory -m 0755 "${vm_home}/isos"
+
+# Copy jail/bhyve management scripts.
+install_directory -m 0755 /usr/local/etc/rc.d
+
+install_file -m 0555        \
+  /usr/local/sbin/jailctl   \
+  /usr/local/sbin/vmctl     \
+  /usr/local/etc/rc.d/vmctl
+
+install_file -m 0755 /etc/devfs.rules
+
+# Enable jails/bhyve to start on boot.
+sysrc -v           \
+  vmctl_enable=YES \
+  jail_enable=YES

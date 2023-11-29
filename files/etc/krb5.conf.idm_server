@@ -1,0 +1,27 @@
+[libdefaults]
+  default_realm     = ${realm}
+  dns_lookup_kdc    = false
+  dns_lookup_realm  = false
+  allow_weak_crypto = false
+  default_etypes    = aes256-cts-hmac-sha1-96 aes128-cts-hmac-sha1-96
+  forwardable       = true
+  ticket_lifetime   = ${krb5_default_ticket_lifetime:-1 day}
+  renew_lifetime    = ${krb5_default_renew_lifetime:-7 days}
+  default_cc_name   = /tmp/krb5cc_%{uid}
+
+[appdefaults]
+  pam = {
+    minimum_uid = 1000
+    ccache = FILE:/tmp/krb5cc_%u_XXXXXX
+  }
+
+[realms]
+  ${realm} = {
+    kdc            = ${fqdn}
+    admin_server   = ${fqdn}
+    default_domain = ${domain}
+  }
+
+[domain_realm]
+  .${domain} = ${realm}
+  ${domain}  = ${realm}

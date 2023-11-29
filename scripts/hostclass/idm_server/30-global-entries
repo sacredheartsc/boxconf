@@ -1,0 +1,225 @@
+#!/bin/sh
+
+# On the primary (first) LDAP server, create the base DN and all the OUs. At this
+# point, replication should be working (once the secondaries are configured), so
+# we must only do it once.
+[ "${BOXCONF_DEFAULT_IPV4}" = "${idm_primary_server}" ] || return 0
+
+# The base DN.
+ldap_add "$basedn" <<EOF
+objectClass: dcObject
+objectClass: organization
+dc: $(rdn "$basedn")
+o: ${organization}
+EOF
+
+# The accounts OU.
+ldap_add "$accounts_basedn" <<EOF
+objectClass: organizationalUnit
+ou: $(rdn "$accounts_basedn")
+EOF
+
+# The people OU.
+ldap_add "$people_basedn" <<EOF
+objectClass: organizationalUnit
+ou: $(rdn "$people_basedn")
+EOF
+
+# The robots OU.
+ldap_add "$robots_basedn" <<EOF
+objectClass: organizationalUnit
+ou: $(rdn "$robots_basedn")
+EOF
+
+# The hosts OU.
+ldap_add "$hosts_basedn" <<EOF
+objectClass: organizationalUnit
+ou: $(rdn "$hosts_basedn")
+EOF
+
+# The services OU.
+ldap_add "$services_basedn" <<EOF
+objectClass: organizationalUnit
+ou: $(rdn "$services_basedn")
+EOF
+
+# The Kerberos KDC OU.
+ldap_add "$kdc_basedn" <<EOF
+objectClass: organizationalUnit
+ou: $(rdn "$dns_basedn")
+EOF
+
+# The groups OU.
+ldap_add "$groups_basedn" <<EOF
+objectClass: organizationalUnit
+ou: $(rdn "$groups_basedn")
+EOF
+
+# The user private group OU.
+ldap_add "$private_groups_basedn" <<EOF
+objectClass: organizationalUnit
+ou: $(rdn "$private_groups_basedn")
+EOF
+
+# The roles OU.
+ldap_add "$roles_basedn" <<EOF
+objectClass: organizationalUnit
+ou: $(rdn "$roles_basedn")
+EOF
+
+# The automount OU.
+ldap_add "$automount_basedn" <<EOF
+objectClass: organizationalUnit
+ou: $(rdn "$automount_basedn")
+EOF
+
+# The sudo roles OU.
+ldap_add "$sudo_basedn" <<EOF
+objectClass: organizationalUnit
+ou: $(rdn "$sudo_basedn")
+EOF
+
+# The PowerDNS OU.
+ldap_add "$dns_basedn" <<EOF
+objectClass: organizationalUnit
+ou: $(rdn "$dns_basedn")
+EOF
+
+# Forward DNS zone.
+ldap_add "dc=${domain},${dns_basedn}" <<EOF
+objectClass: dNSDomain
+objectClass: domainRelatedObject
+dc: ${domain}
+${pdns_soa_record}
+${pdns_ns_records}
+$(echo "$slapd_server_ids" | awk '{print "aRecord: "$2}')
+associatedDomain: ${domain}
+EOF
+
+# Reverse DNS zone(s).
+for zone in $reverse_dns_zones; do
+  ldap_add "dc=${zone},${dns_basedn}" <<EOF
+objectClass: dNSDomain
+objectClass: domainRelatedObject
+${pdns_soa_record}
+${pdns_ns_records}
+associatedDomain: ${zone}
+EOF
+done
+
+# LDAP SRV record.
+ldap_add "dc=_ldap._tcp,dc=${domain},${dns_basedn}" <<EOF
+objectClass: dNSDomain2
+objectClass: domainRelatedObject
+associatedDomain: _ldap._tcp.${domain}
+$(printf "sRVRecord: 0 100 389 %s.${domain}\n" ${idm_servers})
+EOF
+
+# LDAPS SRV record.
+ldap_add "dc=_ldaps._tcp,dc=${domain},${dns_basedn}" <<EOF
+objectClass: dNSDomain2
+objectClass: domainRelatedObject
+associatedDomain: _ldaps._tcp.${domain}
+$(printf "sRVRecord: 0 100 636 %s.${domain}\n" ${idm_servers})
+EOF
+
+# Kerberos SRV record (UDP).
+ldap_add "dc=_kerberos._udp,dc=${domain},${dns_basedn}" <<EOF
+objectClass: dNSDomain2
+objectClass: domainRelatedObject
+associatedDomain: _kerberos._udp.${domain}
+$(printf "sRVRecord: 0 100 88 %s.${domain}\n" ${idm_servers})
+EOF
+
+# Kerberos SRV record (TCP).
+ldap_add "dc=_kerberos._tcp,dc=${domain},${dns_basedn}" <<EOF
+objectClass: dNSDomain2
+objectClass: domainRelatedObject
+associatedDomain: _kerberos._tcp.${domain}
+$(printf "sRVRecord: 0 100 88 %s.${domain}\n" ${idm_servers})
+EOF
+
+# Kadmin SRV record.
+ldap_add "dc=_kerberos-adm._tcp,dc=${domain},${dns_basedn}" <<EOF
+objectClass: dNSDomain2
+objectClass: domainRelatedObject
+associatedDomain: _kerberos-adm._tcp.${domain}
+$(printf "sRVRecord: 0 100 749 %s.${domain}\n" ${idm_servers})
+EOF
+
+# Kpasswd SRV record.
+ldap_add "dc=_kpasswd._udp,dc=${domain},${dns_basedn}" <<EOF
+objectClass: dNSDomain2
+objectClass: domainRelatedObject
+associatedDomain: _kpasswd._udp.${domain}
+$(printf "sRVRecord: 0 100 464 %s.${domain}\n" ${idm_servers})
+EOF
+
+# Kerberos realm TXT record.
+ldap_add "dc=_kerberos,dc=${domain},${dns_basedn}" <<EOF
+objectClass: dNSDomain2
+objectClass: domainRelatedObject
+associatedDomain: _kerberos.${domain}
+tXTRecord: ${realm}
+EOF
+
+# The boxconf POSIX user.
+# This is a "built-in" administrative account used for host provisioning tasks.
+ldap_add "uid=${boxconf_user},${robots_basedn}" <<EOF
+objectClass: account
+objectClass: posixAccount
+objectClass: krb5KDCEntry
+objectClass: ldapPublicKey
+uid: ${boxconf_user}
+cn: ${boxconf_user}
+uidNumber: ${boxconf_uid}
+gidNumber: ${boxconf_uid}
+homeDirectory: /nonexistent
+loginShell: /bin/sh
+gecos: Boxconf Pseudo-User
+userPassword: {SASL}${boxconf_user}@${realm}
+krb5PrincipalName: ${boxconf_user}@${realm}
+krb5KeyVersionNumber: 0
+krb5MaxLife: ${boxconf_ticket_lifetime}
+krb5MaxRenew: ${boxconf_renew_lifetime}
+krb5KDCFlags: ${boxconf_princ_flags}
+EOF
+
+# The boxconf user's private group.
+ldap_add "cn=${boxconf_user},${private_groups_basedn}" <<EOF
+objectClass: groupOfMembers
+objectClass: posixGroup
+gidNumber: ${boxconf_uid}
+member: uid=${boxconf_user},${robots_basedn}
+EOF
+
+# We precreate one admin group. The default name is 'sysadmins'.
+ldap_add "cn=${idm_admin_group},${groups_basedn}" <<EOF
+objectClass: groupOfMembers
+objectClass: posixGroup
+gidNumber: ${idm_admin_gid}
+EOF
+
+# Sudo role: allow members of the admin group to run any command.
+ldap_add "cn=${idm_admin_group}-all,${sudo_basedn}" <<EOF
+objectClass: sudoRole
+cn: ${idm_admin_group}-all
+sudoUser: %${idm_admin_group}
+sudoHost: ALL
+sudoCommand: ALL
+sudoRunAsUser: ALL
+sudoRunAsGroup: ALL
+EOF
+
+# Sudo role: all the boxconf user to run any command without a password.
+ldap_add "cn=boxconf-all-nopasswd,${sudo_basedn}" <<EOF
+objectClass: sudoRole
+cn: boxconf-all-nopasswd
+sudoUser: ${boxconf_user}
+sudoHost: ALL
+sudoCommand: ALL
+sudoRunAsUser: ALL
+sudoRunAsGroup: ALL
+sudoOption: !authenticate
+sudoOrder: 99
+EOF

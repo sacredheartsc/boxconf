@@ -1,0 +1,15 @@
+[ req ]
+req_extensions = v3_req
+distinguished_name = req_distinguished_name
+prompt = no
+
+[ v3_req ]
+basicConstraints = critical,CA:FALSE
+extendedKeyUsage = clientAuth
+
+
+[ req_distinguished_name ]
+0.domainComponent=com
+1.domainComponent=sacredheartsc
+2.domainComponent=test
+3.commonName=replicator

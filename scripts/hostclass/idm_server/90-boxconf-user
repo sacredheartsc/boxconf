@@ -1,0 +1,4 @@
+#!/bin/sh
+
+# Set the boxconf user's password.
+boxconf_kinit 2>/dev/null || kadmin passwd -p "$boxconf_password" "${boxconf_user}@${realm}"

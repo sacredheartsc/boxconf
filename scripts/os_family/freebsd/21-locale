@@ -1,0 +1,7 @@
+#!/bin/sh
+
+install_template -m 0644   \
+  /etc/profile.d/locale.sh \
+  /etc/login.conf
+
+cap_mkdb /etc/login.conf

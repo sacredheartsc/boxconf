@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# The `idm_server` hostclass needs a server certificate with the following SANS:
+#   - the FQDN
+#   - the IPv4 address of the host (for TLS-encrypted syncrepl)
+#   - the bare domain name
+#
+# Generate the certificate like so:
+#     ./pki cert -d 3650 idm1.idm.example.com idm.example.com IP:10.11.199.2
+#
+# A client certificate is also needed for TLS-authenticated syncrepl. Its subject
+# should be the same as the replicator DN. Generate it like so:
+#     ./pki client-cert -d 3650 cn=replicator,dc=idm,dc=example,dc=com
+#
+# The KDC master keyfile can be generated like so:
+#     kstash --random-key -e aes256-cts-hmac-sha1-96 -k files/var/heimdal/m-key
+#     ./vault encrypt files/var/heimdal/m-key

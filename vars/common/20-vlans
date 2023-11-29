@@ -1,0 +1,31 @@
+#!/bin/sh
+
+# VLANs and subnets are defined in this file.
+# We also detect the current VLAN and set VLAN-specific variables.
+
+vlan_ids='130 199'
+
+vlan130_cidr='10.11.130.0/24'
+vlan130_gateway='10.11.130.1'
+vlan130_ntp_servers='10.11.130.1'
+
+vlan199_cidr='10.11.199.0/24'
+vlan199_gateway='10.11.199.1'
+vlan199_ntp_servers='10.11.199.1'
+
+for vlan_id in $vlan_ids; do
+  # Check if our current IP matches the vlan.
+  ipv4_cidr=$(eval "echo \"\$vlan${vlan_id}_cidr\"")
+  ip_in_subnet "$BOXCONF_DEFAULT_IPV4" "$ipv4_cidr" || continue
+
+  # Set network-releated vars.
+  ipv4_address=$BOXCONF_DEFAULT_IPV4
+  ipv4_prefix=${ipv4_cidr#*/}
+  ipv4_network=${ipv4_cidr%/*}
+  ipv4_netmask=$(prefix2netmask "$ipv4_prefix")
+  eval "ipv4_gateway=\$vlan${vlan_id}_gateway"
+  eval "ntp_servers=\$vlan${vlan_id}_ntp_servers"
+  break
+done
+
+[ -n "${ipv4_gateway:-}" ] || die "no vlan defined for ip: ${BOXCONF_DEFAULT_IPV4}"

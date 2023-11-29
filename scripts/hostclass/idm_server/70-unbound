@@ -1,0 +1,23 @@
+#!/bin/sh
+
+pkg install -y unbound
+
+# Copy unbound configuration.
+install_directory -m 0755 -o unbound "$unbound_blocklist_dir"
+install_template -m 0644 "${unbound_conf_dir}/unbound.conf"
+
+# Enable and start unbound.
+sysrc -v unbound_enable=YES
+service unbound restart
+
+# Download blocklists.
+echo "$unbound_blocklists" | tee "$unbound_blocklist_file"
+install_file -m 0755 /usr/local/sbin/idm-update-unbound-blocklists
+idm-update-unbound-blocklists "$unbound_blocklist_dir" < "$unbound_blocklist_file"
+
+# Now we are ready to use unbound as the local resolver.
+install_template -m 0644 /etc/resolv.conf
+
+# Update blocklists with a cron job.
+echo "@daily root idm-update-unbound-blocklists ${unbound_blocklist_dir} < ${unbound_blocklist_file}" \
+  | tee /etc/cron.d/update-unbound-blocklists

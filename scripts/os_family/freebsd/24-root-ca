@@ -1,0 +1,12 @@
+#!/bin/sh
+
+[ -n "${no_idm:-}" ] && return 0
+
+install_directory -m 0755  \
+  /usr/local/etc           \
+  /usr/local/etc/ssl       \
+  /usr/local/etc/ssl/certs
+
+install_ca_certificate "$ca_cert"
+
+certctl rehash

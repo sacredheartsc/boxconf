@@ -1,0 +1,4 @@
+#!/bin/sh
+
+enable_pf=false
+resolvers='10.11.130.1'

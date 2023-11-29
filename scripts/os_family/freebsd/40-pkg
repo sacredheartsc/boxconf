@@ -1,0 +1,26 @@
+#!/bin/sh
+
+case $BOXCONF_HOSTCLASS in
+  pkg_repository)
+    # Do nothing.
+    return 0
+    ;;
+  freebsd_hypervisor)
+    : # Keep default pkg repo.
+    ;;
+  *)
+    # Configure internal pkg repo.
+    install_directory -m 0755  \
+      /usr/local/etc/pkg       \
+      /usr/local/etc/pkg/repos
+
+    install_file -m 0644                    \
+      /usr/local/etc/ssl/repo.crt           \
+      /usr/local/etc/pkg/repos/FreeBSD.conf
+
+    install_template -m 0644 /usr/local/etc/pkg/repos/internal.conf
+    ;;
+esac
+
+pkg update -f
+pkg install $install_packages

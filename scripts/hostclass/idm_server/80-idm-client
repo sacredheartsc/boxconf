@@ -1,0 +1,25 @@
+#!/bin/sh
+
+# NB: We use Eyrie's pam_krb5 from ports. The pam_krb5.so in the base system
+#     doesn't cleanup ccache on logout.
+pkg install -y          \
+  nss-pam-ldapd-sasl    \
+  pam_krb5-heimdal_base
+
+install_file -m 0644 \
+  /etc/nsswitch.conf \
+  /etc/pam.d/sshd    \
+  /etc/pam.d/system
+
+install_template -m 0644    \
+  /usr/local/etc/nslcd.conf \
+  /etc/nscd.conf
+
+ln -snfv "${slapd_conf_dir}/ldap.conf" /usr/local/etc/ldap.conf
+
+sysrc -v           \
+  nslcd_enable=YES \
+  nscd_enable=YES
+
+service nslcd restart
+service nscd restart

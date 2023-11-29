@@ -1,0 +1,143 @@
+#!/bin/sh
+
+_boxconf_try_files(){
+  for _bcsf_file in                                        \
+    "${1}.${BOXCONF_HOSTNAME}"                             \
+    "${1}.${BOXCONF_HOSTCLASS}.${BOXCONF_OS_DISTRIBUTION}" \
+    "${1}.${BOXCONF_OS_DISTRIBUTION}.${BOXCONF_HOSTCLASS}" \
+    "${1}.${BOXCONF_HOSTCLASS}.${BOXCONF_OS_FAMILY}"       \
+    "${1}.${BOXCONF_OS_FAMILY}.${BOXCONF_HOSTCLASS}"       \
+    "${1}.${BOXCONF_HOSTCLASS}"                            \
+    "${1}.${BOXCONF_OS_DISTRIBUTION}"                      \
+    "${1}.${BOXCONF_OS_FAMILY}"                            \
+    "${1}"
+  do
+    if [ -f "${BOXCONF_FILE_DIR}${_bcsf_file}" ]; then
+      echo "${BOXCONF_FILE_DIR}${_bcsf_file}"
+      return
+    fi
+  done
+
+  bug "no source file found for ${1}"
+}
+
+install_file(){
+  _bcif_install_args='-Cv'
+  _bcif_mode=0644
+
+  while getopts m:o:g: _bcif_opt; do
+    case $_bcif_opt in
+      m) _bcif_mode=$OPTARG ;;
+      o) _bcif_install_args="${_bcif_install_args} -o ${OPTARG}" ;;
+      g) _bcif_install_args="${_bcif_install_args} -g ${OPTARG}" ;;
+    esac
+  done
+  shift $((OPTIND - 1))
+
+  while [ $# -gt 0 ]; do
+    _bcif_src=$(_boxconf_try_files "$1")
+    if _boxconf_is_encrypted "$_bcif_src"; then
+      _boxconf_decrypt "$_bcif_src" "${_bcif_src}.plaintext"
+      install -m "$_bcif_mode" $_bcif_install_args "${_bcif_src}.plaintext" "$1"
+    else
+      install -m "$_bcif_mode" $_bcif_install_args "$_bcif_src" "$1"
+    fi
+    shift
+  done
+}
+
+install_directory(){
+  _bcid_install_args='-Cdv'
+  _bcid_mode=0755
+
+  while getopts m:o:g: _bcid_opt; do
+    case $_bcid_opt in
+      m) _bcid_mode=$OPTARG ;;
+      o) _bcid_install_args="${_bcid_install_args} -o ${OPTARG}" ;;
+      g) _bcid_install_args="${_bcid_install_args} -g ${OPTARG}" ;;
+    esac
+  done
+  shift $((OPTIND - 1))
+
+  while [ $# -gt 0 ]; do
+    install -m "$_bcid_mode" $_bcid_install_args "$1"
+    shift
+  done
+}
+
+install_template(){
+  _bcit_install_args='-Cv'
+  _bcit_mode=0644
+
+  while getopts m:o:g: _bcit_opt; do
+    case $_bcit_opt in
+      m) _bcit_mode=$OPTARG ;;
+      o) _bcit_install_args="${_bcit_install_args} -o ${OPTARG}" ;;
+      g) _bcit_install_args="${_bcit_install_args} -g ${OPTARG}" ;;
+    esac
+  done
+  shift $((OPTIND - 1 ))
+
+  while [ $# -gt 0 ]; do
+    _bcit_src=$(_boxconf_try_files "$1")
+
+    eval "cat <<__BOXCONF_EOF__ >${_bcit_src}.render
+$(cat "$_bcit_src")
+__BOXCONF_EOF__
+"
+    [ -s "${_bcit_src}.render" ] || bug "failed to render template: ${_bcit_src}"
+    install -m "$_bcit_mode" $_bcit_install_args "${_bcit_src}.render" "$1"
+    shift
+  done
+}
+
+install_certificate(){
+  _bcic_install_args='-Cv'
+  _bcic_mode=0644
+
+  while getopts m:o:g: _bcic_opt; do
+    case $_bcic_opt in
+      m) _bcic_mode=$OPTARG ;;
+      o) _bcic_install_args="${_bcic_install_args} -o ${OPTARG}" ;;
+      g) _bcic_install_args="${_bcic_install_args} -g ${OPTARG}" ;;
+    esac
+  done
+  shift $((OPTIND - 1))
+
+  install -m "$_bcic_mode" $_bcic_install_args "${BOXCONF_CA_DIR}/${1}.fullchain.crt" "$2"
+}
+
+install_certificate_key(){
+  _bcick_install_args='-Cv'
+  _bcick_mode=0600
+
+  while getopts m:o:g: _bcick_opt; do
+    case $_bcick_opt in
+      m) _bcick_mode=$OPTARG ;;
+      o) _bcick_install_args="${_bcick_install_args} -o ${OPTARG}" ;;
+      g) _bcick_install_args="${_bcick_install_args} -g ${OPTARG}" ;;
+    esac
+  done
+  shift $((OPTIND - 1))
+
+  _boxconf_get_vault_password
+
+  install -m "$_bcick_mode" $_bcick_install_args /dev/null "$2"
+  PASS=$BOXCONF_VAULT_PASSWORD openssl ec -in "${BOXCONF_CA_DIR}/${1}.key" -out "$2" -passin env:PASS
+}
+
+install_ca_certificate(){
+  _bcicc_install_args='-Cv'
+  _bcicc_mode=0644
+
+  while getopts m:o:g: _bcicc_opt; do
+    case $_bcicc_opt in
+      m) _bcicc_mode=$OPTARG ;;
+      o) _bcicc_install_args="${_bcicc_install_args} -o ${OPTARG}" ;;
+      g) _bcicc_install_args="${_bcicc_install_args} -g ${OPTARG}" ;;
+    esac
+  done
+  shift $((OPTIND - 1))
+
+  install -m "$_bcicc_mode" $_bcicc_install_args "${BOXCONF_CA_DIR}/ca.crt" "$1"
+}

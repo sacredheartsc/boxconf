@@ -1,0 +1,219 @@
+#!/bin/sh
+
+# -----------------------------------------------------------------------------
+# BSD 2-Clause License
+#
+# Copyright (c) 2023, stonewall (stonewall@sacredheartsc.com)
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice, this
+#    list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+#    this list of conditions and the following disclaimer in the documentation
+#    and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# -----------------------------------------------------------------------------
+#                                                                           JMJ
+# Manage password-encrypted files using OpenSSL.
+#
+# Requirements: POSIX sh, OpenSSL
+#
+# It is assumed that the same password is used to encrypt all files.
+# The script will acquire the password from the VAULT_PASSWORD environment
+# variable, the file .vault_password in the script's directory, or by
+# prompting interactively.
+#
+# While editing encrypted files, a temporary plaintext version is stored on
+# /tmp. Ideally, the /tmp partition is mounted as a tmpfs/in-memory filesystem
+# on your machine.
+#
+# Examples:
+# =========
+#
+# Export the vault password to the environment:
+#
+#   $ read -r VAULT_PASSWORD
+#   hunter2
+#   $ export VAULT_PASSWORD
+#
+# Create a new encrypted file ($EDITOR will be invoked):
+#
+#   $ ./vault create passwords.txt
+#
+# Print the plaintext context of an encrypted file to stdout:
+#
+#   $ ./vault decrypt passwords.txt
+#   supersecret
+#
+# Edit an exiting encrypted file with $EDITOR:
+#
+#   $ ./vault edit passwords.txt
+#
+# Encrypt an existing file (will be overwritten with its encrypted content):
+#
+#   $ ./vault encrypt private.key
+#
+# Re-encrypt a file with a new password:
+#
+#   $ ./vault reencrypt passwords.txt
+#   Enter new vault password:
+
+set -eu
+
+PROGNAME=vault
+USAGE="${PROGNAME} <check|create|decrypt|edit|encrypt|reencrypt|> FILE..."
+
+SCRIPT_ROOT=$(dirname "$(readlink -f "$0")")
+ORIG_STTY=$(stty -g)
+
+CIPHER=aes256
+
+usage(){
+  printf 'usage: %s\n' "$USAGE" 1>&2
+  exit 1
+}
+
+warn(){
+  printf '%s: %s\n' "$PROGNAME" "$1" 1>&2
+}
+
+die(){
+  warn "$1"
+  exit 1
+}
+
+get_password(){
+  if [ -n "${VAULT_PASSWORD:-}" ]; then
+    return
+  elif [ -f "${SCRIPT_ROOT}/.vault_password" ]; then
+    VAULT_PASSWORD=$(cat "${SCRIPT_ROOT}/.vault_password")
+  else
+    printf 'Enter vault password: ' 1>&2
+    stty -echo
+    read -r VAULT_PASSWORD
+    stty "$ORIG_STTY"
+    echo
+  fi
+}
+
+is_encrypted(){
+  head -n1 "$1" | grep -q '^Salted__'
+}
+
+[ $# -gt 1 ] || usage
+action=$1; shift
+
+TMPFILE=$(mktemp)
+trap 'rm -f "$TMPFILE"; stty "$ORIG_STTY"' HUP INT QUIT TERM EXIT
+
+case $action in
+  check)
+    while [ $# -gt 0 ]; do
+      if [ ! -f "$1" ]; then
+        warn "file does not exist: ${1}"
+      elif is_encrypted "$1"; then
+        echo "${1} is encrypted"
+      else
+        echo "${1} is not encrypted"
+      fi
+      shift
+    done
+    ;;
+
+  create)
+    get_password
+    if [ -e "$1" ]; then
+      die "file already exists: ${1}"
+    else
+      "$EDITOR" "$TMPFILE"
+      PASS=$VAULT_PASSWORD openssl enc -in "$TMPFILE" -out "$1" -e "-${CIPHER}" -pass env:PASS -pbkdf2
+    fi
+    ;;
+
+  decrypt)
+    get_password
+    while [ $# -gt 0 ]; do
+      if [ ! -f "$1" ]; then
+        warn "file does not exist: ${1}"
+      elif ! is_encrypted "$1"; then
+        warn "file is not encrypted: ${1}"
+      else
+        PASS=$VAULT_PASSWORD openssl enc -in "$1" -d "-${CIPHER}" -pass env:PASS -pbkdf2
+      fi
+      shift
+    done
+    ;;
+
+  edit)
+    get_password
+    while [ $# -gt 0 ]; do
+      if [ ! -f "$1" ]; then
+        warn "file does not exist: ${1}"
+      elif ! is_encrypted "$1"; then
+        warn "file is not encrypted: ${1}"
+      else
+        PASS=$VAULT_PASSWORD openssl enc -in "$1" -out "$TMPFILE" -d "-${CIPHER}" -pass env:PASS -pbkdf2
+        "$EDITOR" "$TMPFILE"
+        PASS=$VAULT_PASSWORD openssl enc -in "$TMPFILE" -out "$1" -e "-${CIPHER}" -pass env:PASS -pbkdf2
+      fi
+      shift
+    done
+    ;;
+
+  encrypt)
+    get_password
+    while [ $# -gt 0 ]; do
+      if [ ! -f "$1" ]; then
+        warn "file does not exist: ${1}"
+      elif is_encrypted "$1"; then
+        warn "file is already encrypted: ${1}"
+      else
+        PASS=$VAULT_PASSWORD openssl enc -in "$1" -out "$TMPFILE" -e "-${CIPHER}" -pass env:PASS -pbkdf2
+        cp "$TMPFILE" "$1"
+      fi
+      shift
+    done
+    ;;
+
+
+  reencrypt)
+    get_password
+
+    if [ -z "${VAULT_NEW_PASSWORD:-}" ]; then
+      printf 'Enter new vault password: ' 1>&2
+      stty -echo
+      read -r VAULT_NEW_PASSWORD
+      stty "$ORIG_STTY"
+      echo
+    fi
+
+    while [ $# -gt 0 ]; do
+      if [ ! -f "$1" ]; then
+        warn "file does not exist: ${1}"
+      elif ! is_encrypted "$1"; then
+        warn "file is not encrypted: ${1}"
+      else
+        PASS=$VAULT_PASSWORD openssl enc -in "$1" -out "$TMPFILE" -d "-${CIPHER}" -pass env:PASS -pbkdf2
+        PASS=$VAULT_NEW_PASSWORD openssl enc -in "$TMPFILE" -out "$1" -e "-${CIPHER}" -pass env:PASS -pbkdf2
+      fi
+      shift
+    done
+    ;;
+
+  *)
+    usage
+    ;;
+esac

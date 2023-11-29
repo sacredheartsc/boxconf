@@ -1,0 +1,491 @@
+#!/bin/sh
+
+# -----------------------------------------------------------------------------
+# BSD 2-Clause License
+#
+# Copyright (c) 2023, stonewall (stonewall@sacredheartsc.com)
+# Copyright (c) 2016, Devin Teske
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice, this
+#    list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+#    this list of conditions and the following disclaimer in the documentation
+#    and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# -----------------------------------------------------------------------------
+#                                                                           JMJ
+# Manage a PKI of elliptic-curve TLS certificates using OpenSSL.
+#
+# Requirements: OpenSSL, POSIX sh
+#
+# Certificates and private keys are stored in the 'ca' directory with human-
+# readable names. The certs are mapped to their OpenSSL serial number via
+# symlinks.
+#
+# It is assumed that the same passphrase is used to encrypt all private keys.
+# The script will acquire this passphrase from the VAULT_PASSWORD environment
+# variable, the file .vault_password in the script's directory, or by
+# prompting interactively.
+#
+# The CA key is an exception. Its password is acquired from the CA_PASSWORD
+# environment variable, or the file .ca_password.
+#
+# Examples:
+# =========
+#
+# Initialize the CA:
+#
+#   ./pki init -c DNS:test2.example.com test.example.com
+#
+#   - Name constraint will apply to all DNS and email SANs under the given domain.
+#   - Specify additional nameConstraints with -c.
+#
+# Create a server certificate:
+#
+#   ./pki server-cert -d 365       \
+#     server1.test.example.com     \
+#     DNS:cname.test.example.com   \
+#     IP:127.0.0.1/255.255.255.255
+#
+#   - Expiration time is specified in days (-d).
+#   - If no SAN type is specified, 'DNS' is assumed.
+#   - The filenames of the resulting keypair are based on the first SAN.
+#
+# Generate a client certificate for the given DN:
+#
+#   ./pki client-cert -d 365 cn=someuser,dc=test,dc=example,dc=com
+#
+#   - The first parameter must be an LDAP-style DN.
+#   - Additional parameters can be SANs specified in the usual way.
+#   - The filenames of the resulting keypair are based on the DN.
+#
+# Renew a certificate:
+#
+#   ./pki renew -d 365 server1.test.example.com
+#
+# The above commands will result in a CA directory that looks like this:
+#
+#   ca
+#   ├── ca.cnf
+#   ├── ca.crt
+#   ├── ca.key
+#   ├── certs
+#   │   ├── 0E37D8EA85AEB257AEED962CEA3BAFEA0CC0F616.pem
+#   │   └── 5D04998AADB64EFD3F5687D7259D1587664E8C2E.pem
+#   ├── cn=someuser,dc=test,dc=example,dc=com.cnf
+#   ├── cn=someuser,dc=test,dc=example,dc=com.crt -> certs/0E37D8EA85AEB257AEED962CEA3BAFEA0CC0F616.pem
+#   ├── cn=someuser,dc=test,dc=example,dc=com.csr
+#   ├── cn=someuser,dc=test,dc=example,dc=com.fullchain.crt
+#   ├── cn=someuser,dc=test,dc=example,dc=com.key
+#   ├── index.txt
+#   ├── index.txt.attr
+#   ├── server1.test.example.com.cnf
+#   ├── server1.test.example.com.crt -> certs/5D04998AADB64EFD3F5687D7259D1587664E8C2E.pem
+#   ├── server1.test.example.com.csr
+#   ├── server1.test.example.com.fullchain.crt
+#   └── server1.test.example.com.key
+
+set -eu
+
+PROGNAME=pki
+USAGE="<init|server-cert|client-cert|renew>"
+
+DEFAULT_VALID_DAYS=365
+EC_CURVE=prime256v1
+DIGEST=sha256
+CIPHER=aes256
+
+SCRIPT_ROOT=$(dirname "$(readlink -f "$0")")
+CA_ROOT="${SCRIPT_ROOT}/ca"
+ORIG_STTY=$(stty -g)
+
+usage(){
+  printf 'usage: %s %s\n' "$PROGNAME" "$USAGE" 1>&2
+  exit 1
+}
+
+warn(){
+  printf '%s: %s\n' "$PROGNAME" "$1" 1>&2
+}
+
+die(){
+  warn "$1"
+  exit 1
+}
+
+# Ensure $VAULT_PASSWORD exists. If not, acquire it from .vault_password or by
+# prompting interactively.
+get_vault_password(){
+  if [ -n "${VAULT_PASSWORD:-}" ]; then
+    return
+  elif [ -f "${SCRIPT_ROOT}/.vault_password" ]; then
+    VAULT_PASSWORD=$(cat "${SCRIPT_ROOT}/.vault_password")
+  else
+    printf 'Enter vault password: ' 1>&2
+    stty -echo
+    read -r VAULT_PASSWORD
+    stty "$ORIG_STTY"
+    echo
+  fi
+}
+
+# Ensure $CA_PASSWORD exists. If not, acquire it from .ca_password or by
+# prompting interactively.
+get_ca_password(){
+  if [ -n "${CA_PASSWORD:-}" ]; then
+    return
+  elif [ -f "${SCRIPT_ROOT}/.ca_password" ]; then
+    CA_PASSWORD=$(cat "${SCRIPT_ROOT}/.ca_password")
+  else
+    printf 'Enter CA password: ' 1>&2
+    stty -echo
+    read -r CA_PASSWORD
+    stty "$ORIG_STTY"
+    echo
+  fi
+}
+
+# Convert an LDAP DN to its OpenSSL .cnf file representation.
+dn2cnf() {
+  echo "$1" \
+    | tr ',' '\n' \
+    | awk '{a[i++]=$0} END {for (j=i-1; j>=0;) print a[j--] }' \
+    | sed                                        \
+      -e 's/^[Cc][Nn]=/commonName=/'             \
+      -e 's/^[Oo]=/organizationName=/'           \
+      -e 's/^[Oo][Uu]=/organizationalUnitName=/' \
+      -e 's/^[Dd][Cc]=/domainComponent=/'        \
+      -e 's/^[Cc]=/countryName=/'                \
+      -e 's/^[Ss][Tt]=/stateOrProvinceName=/'    \
+      -e 's/^[Ll]=/locality=/'                   \
+      -e 's/^[Ss][Nn]=/surName=/'                \
+      -e 's/^[Gg][Nn]=/givenName=/'              \
+      -e 's/^[Uu][Ii][Dd]=/userId=/'             \
+    | awk '{print NR-1 "." $0}'
+}
+
+post_signing_tasks(){
+  # Create symlink with human-readable name.
+  serial=$(awk 'END{print $3}' "${CA_ROOT}/index.txt")
+  ln -sf "certs/${serial}.pem" "${CA_ROOT}/${name}.crt"
+
+  # Create fullchain certificate.
+  cat "${CA_ROOT}/${name}.crt" "${CA_ROOT}/ca.crt" > "${CA_ROOT}/${name}.fullchain.crt"
+
+  # Delete useless files.
+  rm -f                             \
+    "${CA_ROOT}/index.txt.old"      \
+    "${CA_ROOT}/index.txt.attr.old" \
+    "${CA_ROOT}/serial.old"
+}
+
+# Given an OpenSSL config file ($1.cnf), generate a signed certificate keypair.
+sign_certificate(){
+  name=$1
+  days=${2:-}
+
+  # Generate encrypted private key for the server certificate.
+  PASS="$VAULT_PASSWORD" openssl genpkey     \
+    -algorithm ec                            \
+    -pkeyopt "ec_paramgen_curve:${EC_CURVE}" \
+    "-${CIPHER}"                             \
+    -pass env:PASS                           \
+    -out "${CA_ROOT}/${name}.key"
+
+  # Generate the CSR.
+  PASS="$VAULT_PASSWORD" openssl req -new \
+    -key "${CA_ROOT}/${name}.key"         \
+    "-${DIGEST}"                          \
+    -passin env:PASS                      \
+    -config "${CA_ROOT}/${name}.cnf"      \
+    -out "${CA_ROOT}/${name}.csr"
+
+  # Sign the certificate.
+  PASS="$CA_PASSWORD" openssl ca -batch \
+    -config "${CA_ROOT}/ca.cnf"         \
+    -passin env:PASS                    \
+    ${days:+-days $days}                \
+    -notext                             \
+    -out /dev/null                      \
+    -outdir "${CA_ROOT}/certs"          \
+    -infiles "${CA_ROOT}/${name}.csr"
+
+  post_signing_tasks
+}
+
+# Given an existing CSR ($1.csr), renew the certificate.
+renew_certificate(){
+  name=$1
+  days=${2:-}
+
+  get_ca_password
+
+  # Sign the certificate.
+  PASS="$CA_PASSWORD" openssl ca -batch \
+    -config "${CA_ROOT}/ca.cnf"         \
+    -passin env:PASS                    \
+    ${days:+-days $days}                \
+    -notext                             \
+    -out /dev/null                      \
+    -outdir "${CA_ROOT}/certs"          \
+    -infiles "${CA_ROOT}/${name}.csr"
+
+  post_signing_tasks
+}
+
+[ $# -ge 1 ] || usage
+action=$1; shift
+
+trap 'stty "$ORIG_STTY"' HUP INT QUIT TERM EXIT
+
+case $action in
+  ###############################################################################
+  # pki init: Create the CA
+  ###############################################################################
+  init)
+    USAGE='init [-c CONSTRAINT]... DOMAIN'
+
+    constraints=''
+    while getopts :c: opt; do
+      case $opt in
+        c) constraints="${constraints}, permitted;${OPTARG}" ;;
+        :) usage ;;
+        ?) usage ;;
+      esac
+    done
+    shift $((OPTIND - 1 ))
+
+    [ $# -eq 1 ] || usage
+    domain=$1
+
+    [ -d "$CA_ROOT" ] && die 'CA already exists'
+    get_ca_password
+    mkdir -p "${CA_ROOT}/certs"
+
+    # Generate encrypted private key for CA.
+    PASS="$CA_PASSWORD" openssl genpkey        \
+      -algorithm ec                            \
+      -pkeyopt "ec_paramgen_curve:${EC_CURVE}" \
+      "-${CIPHER}"                             \
+      -pass env:PASS                           \
+      -out "${CA_ROOT}/ca.key"
+
+    # Create a config file for the CA certificate.
+    cat > "${CA_ROOT}/ca.cnf" <<EOF
+[ req ]
+x509_extensions = v3_req
+distinguished_name = req_distinguished_name
+prompt = no
+
+[ v3_req ]
+basicConstraints = critical, CA:TRUE, pathlen:0
+keyUsage = critical, keyCertSign, cRLSign
+nameConstraints = permitted;DNS:${domain}, permitted;DNS:.${domain}, permitted;email:.${domain}${constraints}
+
+[ req_distinguished_name ]
+O = ${domain}
+CN = Certificate Authority
+
+[ ca ]
+preserve   = yes
+default_ca = CA_own
+
+[ CA_own ]
+dir              = ./ca
+new_certs_dir    = \$dir/certs
+database         = \$dir/index.txt
+rand_serial      = yes
+unique_subject   = no
+certificate      = \$dir/ca.crt
+private_key      = \$dir/ca.key
+default_days     = ${DEFAULT_VALID_DAYS}
+default_crl_days = 30
+default_md       = ${DIGEST}
+preserve         = yes
+policy           = policy_anything
+copy_extensions  = copy
+x509_extensions  = v3
+
+[ v3 ]
+basicConstraints = critical, CA:FALSE
+
+[ policy_anything ]
+countryName            = optional
+stateOrProvinceName    = optional
+localityName           = optional
+organizationName       = optional
+organizationalUnitName = optional
+commonName             = optional
+emailAddress           = optional
+EOF
+
+    # Self-sign the CA certificate.
+    PASS="$CA_PASSWORD" openssl req -new -x509 \
+      -days 3650                               \
+      "-${DIGEST}"                             \
+      -passin env:PASS                         \
+      -config "${CA_ROOT}/ca.cnf"              \
+      -key "${CA_ROOT}/ca.key"                 \
+      -out "${CA_ROOT}/ca.crt"
+
+    # Create empty index db.
+    [ -f "${CA_ROOT}/index.txt" ] || touch "${CA_ROOT}/index.txt"
+  ;;
+
+
+  ###############################################################################
+  # pki server-cert: Create a server certificate keypair.
+  ###############################################################################
+  server-cert|server|cert)
+    USAGE='server-cert [-d DAYS] SAN...'
+
+    while getopts :d: opt; do
+      case $opt in
+        d) days=$OPTARG ;;
+        :) usage ;;
+        ?) usage ;;
+      esac
+    done
+    shift $((OPTIND - 1 ))
+
+    [ $# -ge 1 ] || usage
+    name=${1#*:}
+
+    [ -e "${CA_ROOT}/${name}.cnf" ] && die "certificate already exists: ${name}"
+
+    get_ca_password
+    get_vault_password
+
+    # Generate the SAN list. If the arg contains a ':', pass along as-is.
+    # If no ':' is present, assume type 'DNS:'.
+    if [ "${1#*:}" = "$1" ]; then
+      sans="DNS:${1}"
+    else
+      sans=$1
+    fi
+    shift
+
+    while [ $# -gt 0 ]; do
+      if [ "${1#*:}" = "$1" ]; then
+        sans="${sans},DNS:${1}"
+      else
+        sans="${sans},${1}"
+      fi
+      shift
+    done
+
+    # Create a config file for the server certificate.
+    cat > "${CA_ROOT}/${name}.cnf" <<EOF
+[ req ]
+req_extensions = v3_req
+distinguished_name = req_distinguished_name
+prompt = no
+
+[ v3_req ]
+basicConstraints = critical,CA:FALSE
+extendedKeyUsage = serverAuth
+subjectAltName = ${sans}
+
+[ req_distinguished_name ]
+CN = ${name}
+EOF
+
+    # Generate and sign the certificate.
+    sign_certificate "$name" "${days:-}"
+    ;;
+
+
+  ###############################################################################
+  # pki client-cert: Create a client certificate keypair.
+  ###############################################################################
+  client-cert|client)
+    USAGE='client-cert DN [SAN...]'
+
+    while getopts :d: opt; do
+      case $opt in
+        d) days=$OPTARG ;;
+        :) usage ;;
+        ?) usage ;;
+      esac
+    done
+    shift $((OPTIND - 1 ))
+
+    [ $# -ge 1 ] || usage
+    dn=$1; shift
+
+    [ -e "${CA_ROOT}/${dn}.cnf" ] && die "certificate already exists: ${dn}"
+
+    get_ca_password
+    get_vault_password
+
+    # Generate the SAN list.
+    if [ $# -gt 0 ]; then
+      sans=$1; shift
+      while [ $# -gt 0 ]; do
+        sans="${sans}, ${1}"
+        shift
+      done
+    fi
+
+    # Create a config file for the client certificate.
+    cat > "${CA_ROOT}/${dn}.cnf" <<EOF
+[ req ]
+req_extensions = v3_req
+distinguished_name = req_distinguished_name
+prompt = no
+
+[ v3_req ]
+basicConstraints = critical,CA:FALSE
+extendedKeyUsage = clientAuth
+${sans:+subjectAltName = $sans}
+
+[ req_distinguished_name ]
+$(dn2cnf "$dn")
+EOF
+
+    # Generate and sign the certificate.
+    sign_certificate "$dn" "${days:-}"
+    ;;
+
+
+  ###############################################################################
+  # pki renew: Renew an existing certificate.
+  ###############################################################################
+  renew)
+    USAGE='renew [-d DAYS] NAME'
+
+    while getopts :d: opt; do
+      case $opt in
+        d) days=$OPTARG ;;
+        :) usage ;;
+        ?) usage ;;
+      esac
+    done
+    shift $((OPTIND - 1 ))
+
+    [ $# -eq 1 ] || usage
+    name=$1
+
+    [ -f "${CA_ROOT}/${name}.csr" ] || die "CSR does not exist: ${name}.csr"
+
+    renew_certificate "$name" "${days:-}"
+    ;;
+
+  *)
+    usage
+    ;;
+esac

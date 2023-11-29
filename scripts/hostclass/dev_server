@@ -1,0 +1,16 @@
+#!/bin/sh
+
+pkg install -y       \
+  htop               \
+  pwgen              \
+  ImageMagick7-nox11 \
+  p5-Image-ExifTool  \
+  jq                 \
+  rsync              \
+  sieve-connect      \
+  sshpass            \
+  stow               \
+  tmux               \
+  tree               \
+  w3m                \
+  vim

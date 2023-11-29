@@ -1,0 +1,6 @@
+.ca_password
+.vault_password
+*.pyc
+*.swp
+*.swo
+.nfs*

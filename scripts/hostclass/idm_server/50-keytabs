@@ -1,0 +1,12 @@
+#!/bin/sh
+
+# Create state dataset to persist keytabs across OS rebuilds.
+create_dataset -o "mountpoint=${keytab_dir}" "${state_dataset}/keytabs"
+
+# Host keytab.
+[ -f "${keytab_dir}/host.keytab" ] || kadmin ext_keytab -k "${keytab_dir}/host.keytab" -r "host/${fqdn}"
+ln -snfv "${keytab_dir}/host.keytab" /etc/krb5.keytab
+
+# slapd server keytab.
+[ -f "$slapd_keytab" ] || kadmin ext_keytab -k "$slapd_keytab" -r "ldap/${fqdn}"
+chown "$slapd_user" "$slapd_keytab"

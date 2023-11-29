@@ -1,0 +1,10 @@
+#!/bin/sh
+
+pkg install -y powerdns
+
+# Generate pdns configuration.
+install_template -m 0644 "${pdns_conf_dir}/pdns.conf"
+
+# Enable pdns and start it.
+sysrc -v pdns_enable=YES
+service pdns restart

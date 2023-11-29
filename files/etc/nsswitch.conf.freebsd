@@ -1,0 +1,10 @@
+group: cache files ldap
+hosts: cache files dns
+netgroup: files
+networks: files
+passwd: cache files ldap
+shells: files
+services: files
+protocols: files
+rpc: files
+sudoers: files ldap

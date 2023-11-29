@@ -1,0 +1,14 @@
+PermitRootLogin prohibit-password
+AuthorizedKeysFile	.ssh/authorized_keys
+
+# NB: KbdInteractiveAuthentication causes the SSHD child process to fork,
+# which results in pam_krb5 losing the KRB5 ccache.
+KbdInteractiveAuthentication no
+PasswordAuthentication yes
+
+GSSAPIAuthentication yes
+GSSAPICleanupCredentials yes
+UsePAM yes
+UseDNS no
+
+Subsystem	sftp	/usr/libexec/sftp-server
