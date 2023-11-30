@@ -1,0 +1,7 @@
+CanonicalizeHostname always
+CanonicalDomains ${domain}
+KnownHostsCommand /usr/local/libexec/idm-ssh-known-hosts %H
+
+Host *.${domain}
+  GSSAPIAuthentication yes
+  GSSAPIDelegateCredentials yes

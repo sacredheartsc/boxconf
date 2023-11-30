@@ -3,6 +3,7 @@
 enable_pf=true
 allow_wx=0
 cx_lowest=Cmax
+intel_epp=50
 ca_cert=/usr/local/etc/ssl/certs/ca.crt
 pkg_host="pkg.${domain}"
 keytab_dir=/var/db/keytabs

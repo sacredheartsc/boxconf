@@ -1,0 +1,11 @@
+#!/bin/sh
+
+set -eu -o pipefail
+
+/usr/local/bin/ldapsearch \
+  -QLLL \
+  -o ldif_wrap=no \
+  -b '${hosts_basedn}' \
+  "(&(sshPublicKey=*)(associatedDomain=\$1))" \
+  sshPublicKey \
+  | /usr/bin/sed -ne 's/^sshPublicKey: //p'

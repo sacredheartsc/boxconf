@@ -35,6 +35,11 @@ krb5_max_ticket_lifetime=86400 # 1 day
 krb5_max_renew_lifetime=604800 # 1 week
 krb5_host_princ_flags=382      # requires-pre-auth
 
+system_keytab_group=sysccache
+system_keytab_gid=788
+ssh_authorized_keys_user=authzkeys
+ssh_authorized_keys_uid=789
+
 tcp_buffer_size=2097152  # suitable for 1 GigE
 
 # The poudriere server must be built before the IDM servers, which results

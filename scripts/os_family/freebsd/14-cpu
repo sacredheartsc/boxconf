@@ -16,3 +16,11 @@ sysrc -v                             \
   microcode_update_enable=YES        \
   performance_cx_lowest="$cx_lowest" \
   economy_cx_lowest="$cx_lowest"
+
+# Set energy/performance preference for Intel P-states.
+# 0 = most performance, 1 = most power savings
+if sysctl -n dev.hwpstate_intel.0.epp >/dev/null 2>&1; then
+  for n in $(seq 0 $(($(sysctl -n hw.ncpu)-1))); do
+    set_sysctl "dev.hwpstate_intel.${n}.epp=${intel_epp}"
+  done
+fi

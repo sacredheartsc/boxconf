@@ -76,10 +76,14 @@ EOF
 get_keytab "${keytab_dir}/host.keytab" "host/${fqdn}"
 ln -snfv "${keytab_dir}/host.keytab" /etc/krb5.keytab
 
+# Create group for accessing system ccache.
+pw groupshow "$system_ccache_group" > /dev/null 2>&1 \
+  || pw groupadd "$system_ccache_group" -g "$system_ccache_gid"
+
 sysrc -v                                                          \
   kstart_instances+='system nslcd'                                \
   kstart_system_keytab='/etc/krb5.keytab'                         \
-  kstart_system_flags="-aLK 120 -k /tmp/krb5cc_0 -u host/${fqdn}" \
+  kstart_system_flags="-aLK 120 -k /tmp/krb5cc_0 -g ${system_ccache_group} -o root -m 660 -u host/${fqdn}" \
   kstart_nslcd_keytab='/etc/krb5.keytab'                          \
   kstart_nslcd_flags="-aLK 120 -g ${nslcd_user} -o ${nslcd_user} -k /tmp/krb5cc_$(id -u "$nslcd_user") -u host/${fqdn}" \
   kstart_enable=YES                                               \
@@ -89,3 +93,11 @@ sysrc -v                                                          \
 service kstart restart
 service nslcd restart
 service nscd restart
+
+# Create user for performing authorized_keys lookups.
+pw usershow "$ssh_authorized_keys_user" > /dev/null 2>&1 \
+  || pw useradd "$ssh_authorized_keys_user" -u "$ssh_authorized_keys_uid" -g "$system_ccache_group"
+
+install_template -m 0555                     \
+  /usr/local/libexec/idm-ssh-known-hosts     \
+  /usr/local/libexec/idm-ssh-authorized-keys

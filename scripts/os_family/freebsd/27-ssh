@@ -20,5 +20,7 @@ do
   ln -snvf "${ssh_host_key_dir}/${key}.pub" "/etc/ssh/${key}.pub"
 done
 
-install_file -m 0644 /etc/ssh/sshd_config
+install_template -m 0644 \
+  /etc/ssh/sshd_config   \
+  /etc/ssh/ssh_config
 service sshd restart
