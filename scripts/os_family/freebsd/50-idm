@@ -52,7 +52,7 @@ aRecord: ${BOXCONF_DEFAULT_IPV4}
 pTRRecord: ${fqdn}
 krb5PrincipalName: host/${fqdn}@${realm}
 krb5KeyVersionNumber: 0
-krb5KDCFlags: ${krb5_host_princ_flags}
+krb5KDCFlags: ${krb5_default_princ_flags}
 krb5MaxLife: ${krb5_max_ticket_lifetime}
 krb5MaxRenew: ${krb5_max_renew_lifetime}
 $(cat /etc/ssh/ssh_host_*_key.pub | cut -d' ' -f-2 | sed 's/^/sshPublicKey: /')
@@ -73,7 +73,7 @@ associatedDomain: $(ip2rdns "$BOXCONF_DEFAULT_IPV4")
 EOF
 
 # Create host keytab.
-get_keytab "${keytab_dir}/host.keytab" "host/${fqdn}"
+get_keytab "host/${fqdn}" "${keytab_dir}/host.keytab"
 ln -snfv "${keytab_dir}/host.keytab" /etc/krb5.keytab
 
 # Create group for accessing system ccache.

@@ -1,0 +1,5 @@
+#!/bin/sh
+
+postfix_lmtp_host='imap'
+rspamd_controller_port=11334
+allowed_tcp_ports="ssh smtp submission ${rspamd_controller_port}"

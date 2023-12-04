@@ -1,0 +1,58 @@
+#!/bin/sh
+
+pkg install -y \
+  redis        \
+  rspamd
+
+# Create ZFS dataset for Redis DBs.
+create_dataset -o "mountpoint=${redis_data_dir}" "${state_dataset}/redis"
+
+# Generate config files for redis instances.
+install_template -m 0644                 \
+  /usr/local/etc/redis-rspamd.conf       \
+  /usr/local/etc/redis-rspamd-bayes.conf
+
+# Create data directories for each redis instance.
+install_directory -o "$redis_user" -m 0700 \
+  "$rspamd_redis_data_dir"                 \
+  "$rspamd_bayes_redis_data_dir"
+
+# Enable and start redis instances.
+sysrc -v \
+  redis_enable=YES \
+  redis_profiles='rspamd rspamd-bayes'
+
+service redis restart
+
+# Copy rspamd config files.
+install_directory -m 0755             \
+  "${rspamd_conf_dir}/local.d"        \
+  "${rspamd_conf_dir}/local.d/maps.d"
+
+install_file -m 0644                             \
+  "${rspamd_conf_dir}/local.d/logging.inc"       \
+  "${rspamd_conf_dir}/local.d/multimap.conf"     \
+  "${rspamd_conf_dir}/local.d/phishing.conf"     \
+  "${rspamd_conf_dir}/local.d/replies.conf"      \
+  "${rspamd_conf_dir}/local.d/worker-normal.inc"
+
+rspamd_controller_password_hash=$(rspamadm pw -p "$rspamd_controller_password")
+
+install_template -m 0644                             \
+  "${rspamd_conf_dir}/local.d/classifier-bayes.conf" \
+  "${rspamd_conf_dir}/local.d/dkim_signing.conf"     \
+  "${rspamd_conf_dir}/local.d/redis.conf"            \
+  "${rspamd_conf_dir}/local.d/worker-controller.inc" \
+  "${rspamd_conf_dir}/local.d/worker-proxy.inc"
+
+printf '%s\n' ${rspamd_domain_whitelist} | tee "${rspamd_conf_dir}/local.d/maps.d/domain-whitelist.map"
+
+# Add rspamd user to redis group, so it can write to the redis unix socket.
+pw groupmod "$redis_user" -m "$rspamd_user"
+
+# Enable and start rspamd.
+sysrc -v rspamd_enable=YES
+
+# The rspamd rc script seems to hold onto open descriptors, which causes
+# the parent boxconf SSH process to never close.
+service rspamd restart > /dev/null 2>&1 < /dev/null

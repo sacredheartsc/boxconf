@@ -23,3 +23,7 @@ sysrc -v           \
 
 service nslcd restart
 service nscd restart
+
+install_template -m 0555                     \
+  /usr/local/libexec/idm-ssh-known-hosts     \
+  /usr/local/libexec/idm-ssh-authorized-keys

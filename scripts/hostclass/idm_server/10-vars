@@ -51,8 +51,6 @@ slapd_tls_cert="${slapd_conf_dir}/slapd.crt"
 slapd_tls_key="${slapd_conf_dir}/slapd.key"
 slapd_replicator_tls_cert="${slapd_conf_dir}/replicator.crt"
 slapd_replicator_tls_key="${slapd_conf_dir}/replicator.key"
-saslauthd_runtime_dir=/var/run/saslauthd
-saslauthd_user=cyrus
 kdc_conf_dir=/var/heimdal
 kdc_basedn="ou=kdc,${accounts_basedn}"
 kdc_default_princ_flags=382 # requires-pre-auth

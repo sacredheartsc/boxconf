@@ -39,7 +39,7 @@ all the necessary packages and serve them over HTTP.
 
 On the FreeBSD hypervisor, use `jailctl` to create a jail for the `pkg` repo.
 The following command will create a jail named `pkg1` with VLAN tag `199`,
-IP address `10.11.199.4`, 32G memory limit, 256G disk quota, and 16 CPU cores:
+IP address `10.11.199.4`, 128G memory limit, 256G disk quota, and 16 CPU cores:
 
     alcatraz1# jailctl create \
       -v 199                  \
@@ -49,9 +49,13 @@ IP address `10.11.199.4`, 32G memory limit, 256G disk quota, and 16 CPU cores:
       -r 8.8.8.8  -r 8.8.4.4  \
       -k ~/id_ed25519.pub     \
       -c 2-17                 \
-      -m 32g                  \
+      -m 128g                 \
       -q 256g                 \
       pkg1 freebsd13
+
+Note: Poudriere's default virtual memory limit is 8GB per builder. Make sure to
+set a virtual memory limit for the `pkg1` jail of at least `8GB * ncpu`, or
+else you'll get errors like "Cannot fork: resource temporarily unavailable."
 
 Poudriere requires some special jail options. Run `jailctl edit pkg1` and set
 the following options:

@@ -1,0 +1,52 @@
+#!/bin/sh
+
+# Install packages.
+pkg install -y         \
+  postfix              \
+  cyrus-sasl-saslauthd
+
+# Create SMTP service principal and keytab.
+create_krb5_service "smtp/${fqdn}"
+get_keytab           \
+  -o root            \
+  -g "$postfix_user" \
+  -m 0640            \
+  "smtp/${fqdn}"     \
+  "$postfix_keytab"
+
+# Generate dhparams.
+[ -f "$postfix_dhparams" ] || openssl dhparam -out "$postfix_dhparams" 2048
+
+# Copy postfix configuration.
+install_template -m 0644                     \
+  "${postfix_conf_dir}/main.cf"              \
+  "${postfix_conf_dir}/virtual_mailboxes.cf" \
+  "${postfix_conf_dir}/virtual_aliases.cf"
+install_file -m 0644 "${postfix_conf_dir}/master.cf"
+
+# Copy TLS certificate for SMTP server.
+install_certificate     -m 0644 -o root -g "$postfix_user" "$fqdn" "$postfix_tls_cert"
+install_certificate_key -m 0640 -o root -g "$postfix_user" "$fqdn" "$postfix_tls_key"
+
+# Copy postfix SASL configuration.
+install_template -m 0644 /usr/local/lib/sasl2/smtpd.conf
+
+# Allow postfix to read the saslauthd socket.
+install_directory -m 0750 -o "$saslauthd_user" -g "$postfix_user" "$saslauthd_runtime_dir"
+
+# Enable and start postfix and dependencies.
+sysrc -v                                  \
+  saslauthd_flags='-a kerberos5'          \
+  saslauthd_enable=YES                    \
+  postfix_enable=YES                      \
+  kstart_instances+=postfix               \
+  kstart_postfix_keytab="$postfix_keytab" \
+  kstart_postfix_flags="-aLK 120 -g ${postfix_user} -o ${postfix_user} -k /tmp/krb5cc_$(id -u "$postfix_user") -u smtp/${fqdn}"
+
+service kstart restart
+service saslauthd restart
+service postfix restart
+
+# Use postfix as the system MTA.
+install_directory -m 0755 /usr/local/etc/mail
+install_file -m 0644 /usr/local/etc/mail/mailer.conf

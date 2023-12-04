@@ -23,14 +23,35 @@ boxconf_kinit(){
 }
 
 get_keytab(){
-  # $1 = keytab, $2 = princ
+  # $1 = princ, $2 = keytab
+
+  _gkt_owner=0
+  _gkt_group=0
+  _gkt_mode=600
+
+  while getopts m:o:g: _gkt_opt; do
+    case $_gkt_opt in
+      m) _gkt_mode=$OPTARG ;;
+      o) _gkt_owner=$OPTARG ;;
+      g) _gkt_group=$OPTARG ;;
+    esac
+  done
+  shift $((OPTIND - 1))
+
   # If the keytab exists, check if kinit succeeds with the given principal.
-  [ -f "$1" ] && kinit -c "$boxconf_test_ccache" -t "$1" "$2" true && return 0
+  if [ -f "$2" ]; then
+    chmod "$_gkt_mode" "$2"
+    chown "$_gkt_owner" "$2"
+    chgrp "$_gkt_group" "$2"
+    kinit -c "$boxconf_test_ccache" -t "$2" "$1" true && return 0
+  else
+    install -Cv -m "$_gkt_mode" -o "$_gkt_owner" -g "$_gkt_group" /dev/null "$2"
+  fi
 
   # If not, reset the keys.
   printf '%s' "$boxconf_password" \
     | kinit -c "$boxconf_ccache" -S "kadmin/admin@${realm}" --password-file=STDIN "${boxconf_user}@${realm}" \
-      && KRB5CCNAME="$boxconf_ccache" ktutil -v -k "$1" get -p "${boxconf_user}@${realm}" "${2}@${realm}"
+      && KRB5CCNAME="$boxconf_ccache" ktutil -v -k "$2" get -p "${boxconf_user}@${realm}" "${1}@${realm}"
 }
 
 boxconf_kadmin(){
@@ -59,4 +80,18 @@ ldap_modify(){
 
 ldap_delete(){
   boxconf_kinit && KRB5CCNAME="$boxconf_ccache" ldapdelete -Q "$@"
+}
+
+create_krb5_service(){
+  ldap_add "cn=${1},${services_basedn}" <<EOF
+objectClass: applicationProcess
+objectClass: krb5Principal
+objectClass: krb5KDCEntry
+cn: ${1}
+krb5PrincipalName: ${1}@${realm}
+krb5KeyVersionNumber: 0
+krb5KDCFlags: ${krb5_default_princ_flags}
+krb5MaxLife: ${krb5_max_ticket_lifetime}
+krb5MaxRenew: ${krb5_max_renew_lifetime}
+EOF
 }

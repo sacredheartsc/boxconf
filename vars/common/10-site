@@ -2,6 +2,7 @@
 
 organization='SacredHeartSC Test Environment'
 domain=test.sacredheartsc.com
+email_domain=sacredheartsc.com
 locale=en_US.UTF-8
 timezone=America/New_York
 root_authorized_keys='ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICy6mAAeVe2eo5j/d+vLOATvLCOTvp2BMjI9aeW7KcwI'
@@ -16,3 +17,6 @@ reverse_dns_zones="\
 130.11.10.in-addr.arpa
 199.11.10.in-addr.arpa
 "
+
+# Generate with `rspamadm keypair`. Set corresponding private key in ./90-vault:
+rspamd_controller_pubkey='uedcfqt9j4q3rassh3ajog7qti64s643rdti9ea38supj9eayddy'

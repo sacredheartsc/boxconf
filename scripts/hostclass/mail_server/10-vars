@@ -1,0 +1,46 @@
+#!/bin/sh
+
+# You must set the following variables (generate with `rspamadm keypair`):
+#   rspamd_controller_privkey
+#   rspamd_controller_pubkey
+
+: ${rspamd_processes:="$(nproc)"}
+: ${rspamd_dkim_selector:='dkim'}
+: ${rspamd_domain_whitelist:=''}
+: ${rspamd_controller_port:='11334'}
+: ${rspamd_controller_password:='changeme'}
+: ${rspamd_redis_maxmemory:='1g'}
+
+: ${postfix_cipherlist:='ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-CHACHA20-POLY1305'}
+: ${postfix_myorigin:="$email_domain"}
+: ${postfix_myhostname:="$fqdn"}
+: ${postfix_mynetworks:=''}
+: ${postfix_recipient_delimiter:='+'}
+: ${postfix_message_size_limit:='67108864'} # 64 MB
+: ${postfix_virtual_domains:="$email_domain"}
+: ${postfix_lmtp_port:='24'}
+: ${postfix_quota_host:="$postfix_lmtp_host"}
+: ${postfix_quota_port:='10993'}
+: ${postfix_recipient_group:='role-imap-access'}
+
+postfix_spool_dir=/var/spool/postfix
+
+redis_user=redis
+redis_data_dir=/var/db/redis
+
+rspamd_user=rspamd
+rspamd_conf_dir=/usr/local/etc/rspamd
+rspamd_milter_sock="${postfix_spool_dir}/rspamd.sock"
+rspamd_data_dir=/var/db/rspamd
+rspamd_redis_sock=/var/run/redis/rspamd.sock
+rspamd_bayes_redis_sock=/var/run/redis/rspamd-bayes.sock
+rspamd_redis_data_dir="${redis_data_dir}/rspamd"
+rspamd_bayes_redis_data_dir="${redis_data_dir}/rspamd-bayes"
+
+postfix_user=postfix
+postfix_conf_dir=/usr/local/etc/postfix
+postfix_user=postfix
+postfix_keytab="${postfix_conf_dir}/postfix.keytab"
+postfix_tls_cert="${postfix_conf_dir}/postfix.crt"
+postfix_tls_key="${postfix_conf_dir}/postfix.key"
+postfix_dhparams="${postfix_conf_dir}/dhparams.pem"

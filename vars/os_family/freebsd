@@ -1,7 +1,7 @@
 #!/bin/sh
 
 enable_pf=true
-allow_wx=0
+allow_wx=1
 cx_lowest=Cmax
 intel_epp=50
 ca_cert=/usr/local/etc/ssl/certs/ca.crt
@@ -9,6 +9,11 @@ pkg_host="pkg.${domain}"
 keytab_dir=/var/db/keytabs
 ssh_host_key_dir=/var/db/ssh
 nslcd_user=nslcd
+
+saslauthd_runtime_dir=/var/run/saslauthd
+saslauthd_user=cyrus
+
+system_ca_dir=/etc/ssl/certs
 
 # pkg needs this or else it tries to prompt.
 export ASSUME_ALWAYS_YES=yes
