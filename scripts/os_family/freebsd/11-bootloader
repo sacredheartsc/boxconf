@@ -24,6 +24,5 @@ set_loader_conf                           \
   pf_load=YES                             \
   pflog_load=YES                          \
   security.bsd.allow_destructive_dtrace=0 \
-  tmpfs_load=YES
 
-load_kernel_module htcp tmpfs
+load_kernel_module htcp

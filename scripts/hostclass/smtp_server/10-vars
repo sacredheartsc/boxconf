@@ -4,7 +4,7 @@
 #   rspamd_controller_privkey
 #   rspamd_controller_pubkey
 
-: ${rspamd_processes:="$(nproc)"}
+: ${rspamd_processes:="$nproc"}
 : ${rspamd_dkim_selector:='dkim'}
 : ${rspamd_domain_whitelist:=''}
 : ${rspamd_controller_port:='11334'}

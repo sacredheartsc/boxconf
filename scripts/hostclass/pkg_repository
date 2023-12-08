@@ -6,7 +6,7 @@
 #   ./vault encrypt files/usr/local/etc/ssl/repo.key
 
 : ${poudriere_versions:='13.2-RELEASE'}
-: ${poudriere_jobs:="$(nproc)"}
+: ${poudriere_jobs:="$nproc"}
 : ${poudriere_dataset:="${state_dataset:-zroot}"}
 
 poudriere_data_dir=/usr/local/poudriere
@@ -26,7 +26,9 @@ install_file -m 0644 "${poudriere_conf_dir}/make.conf" "${poudriere_conf_dir}/pk
 install_directory -m 0755 /usr/ports/distfiles
 
 # Configure and enable nginx to serve the packages.
-install_template -m 0644 /usr/local/etc/nginx/nginx.conf
+install_template -m 0644           \
+  /usr/local/etc/nginx/nginx.conf  \
+  /usr/local/etc/nginx/vhosts.conf
 sysrc -v nginx_enable=YES
 service nginx restart
 
