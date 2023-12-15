@@ -29,16 +29,19 @@ install_directory -m 0755             \
   "${rspamd_conf_dir}/local.d"        \
   "${rspamd_conf_dir}/local.d/maps.d"
 
-install_file -m 0644                             \
+install_directory -m 0750 -g "$rspamd_user" "${rspamd_data_dir}/dkim"
+
+install_file -m 0640 -g "$rspamd_user"           \
   "${rspamd_conf_dir}/local.d/logging.inc"       \
   "${rspamd_conf_dir}/local.d/multimap.conf"     \
   "${rspamd_conf_dir}/local.d/phishing.conf"     \
   "${rspamd_conf_dir}/local.d/replies.conf"      \
   "${rspamd_conf_dir}/local.d/worker-normal.inc"
 
-rspamd_controller_password_hash=$(rspamadm pw -p "$rspamd_controller_password")
+rspamd_ro_password_hash=$(rspamadm pw -p "$rspamd_ro_password")
+rspamd_rw_password_hash=$(rspamadm pw -p "$rspamd_rw_password")
 
-install_template -m 0644                             \
+install_template -m 0640 -g "$rspamd_user"           \
   "${rspamd_conf_dir}/local.d/classifier-bayes.conf" \
   "${rspamd_conf_dir}/local.d/dkim_signing.conf"     \
   "${rspamd_conf_dir}/local.d/redis.conf"            \

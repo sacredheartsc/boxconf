@@ -1,0 +1,7 @@
+version = 3
+bind = sasl
+sasl_mechs = gssapi
+server_host = ${ldap_uri}
+search_base = ${mail_domains_basedn}
+query_filter = (dc=%s)
+result_attribute = dc

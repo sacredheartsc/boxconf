@@ -26,6 +26,9 @@ mydestination =
 inet_interfaces = all
 inet_protocols  = all
 
+alias_database =
+alias_maps     =
+
 recipient_delimiter          = ${postfix_recipient_delimiter}
 message_size_limit           = ${postfix_message_size_limit}
 strict_rfc821_envelopes      = yes
@@ -36,22 +39,28 @@ show_user_unknown_table_name = no
 tls_medium_cipherlist        = ${postfix_cipherlist}
 tls_preempt_cipherlist       = no
 
-smtpd_tls_security_level = may
-smtpd_tls_auth_only = yes
-smtpd_tls_cert_file = ${postfix_tls_cert}
-smtpd_tls_key_file = ${postfix_tls_key}
-smtpd_tls_mandatory_protocols = >=TLSv1.2
-smtpd_tls_mandatory_ciphers = medium
-smtpd_tls_dh1024_param_file = ${postfix_dhparams}
-smtpd_sasl_security_options = noanonymous, noplaintext
+smtpd_tls_security_level        = may
+smtpd_tls_auth_only             = yes
+smtpd_tls_cert_file             = ${postfix_tls_cert}
+smtpd_tls_key_file              = ${postfix_tls_key}
+smtpd_tls_mandatory_protocols   = >=TLSv1.2
+smtpd_tls_mandatory_ciphers     = medium
+smtpd_tls_dh1024_param_file     = ${postfix_dhparams}
+smtpd_tls_loglevel              = 1
+smtpd_sasl_security_options     = noanonymous, noplaintext
 smtpd_sasl_tls_security_options = noanonymous
-smtpd_helo_required = yes
+smtpd_helo_required             = yes
 
-smtp_tls_CApath = ${system_ca_dir}
-smtp_tls_security_level = may
+smtp_tls_CApath                 = ${system_ca_dir}
+smtp_tls_security_level         = may
+smtp_tls_session_cache_database = btree:\$data_directory/smtp_scache
+smtp_tls_loglevel               = 1
 
-lmtp_tls_CApath = ${system_ca_dir}
-lmtp_tls_security_level = may
+lmtp_tls_CApath                 = ${system_ca_dir}
+lmtp_tls_security_level         = encrypt
+lmtp_tls_wrappermode            = yes
+lmtp_tls_session_cache_database = btree:\$data_directory/lmtp_scache
+smtp_tls_loglevel               = 1
 
 smtpd_helo_required = yes
 smtpd_client_restrictions =
@@ -72,21 +81,21 @@ smtpd_relay_restrictions =
   permit_mynetworks,
   reject_unauth_destination
 smtpd_recipient_restrictions =
-  permit_mynetworks,
-  reject_non_fqdn_recipient,
   reject_unknown_recipient_domain,
-  reject_unauth_pipelining,
   reject_unlisted_recipient,
   reject_unauth_destination,
-  check_policy_service inet:${postfix_quota_host}.${domain}:${postfix_quota_port}
+  check_policy_service inet:${imap_host}.${domain}:${quota_status_port},
+  permit_mynetworks,
+  reject_non_fqdn_recipient,
+  reject_unauth_pipelining
 smtpd_data_restrictions =
   permit_mynetworks,
   reject_unauth_pipelining
 
-virtual_transport       = lmtp:inet:${postfix_lmtp_host}.${domain}:${postfix_lmtp_port}
-virtual_mailbox_domains = ${realm} ${postfix_virtual_domains}
-virtual_mailbox_maps    = ldap:\$config_directory/virtual_mailboxes.cf
-virtual_alias_maps      = ldap:\$config_directory/virtual_aliases.cf
+virtual_transport       = lmtp:inet:${imap_host}.${domain}:${lmtp_port}
+virtual_mailbox_domains = proxy:ldap:\$config_directory/virtual_domains.cf
+virtual_mailbox_maps    = proxy:ldap:\$config_directory/virtual_mailboxes.cf
+virtual_alias_maps      = proxy:ldap:\$config_directory/virtual_aliases.cf
 
 milter_default_action = accept
-#smtpd_milters = unix:${rspamd_milter_sock}
+smtpd_milters = unix:${rspamd_milter_sock}

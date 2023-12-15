@@ -32,7 +32,8 @@ install_file -m 0644 \
   "${slapd_conf_dir}/schema/heimdal.ldif"     \
   "${slapd_conf_dir}/schema/openssh-lpk.ldif" \
   "${slapd_conf_dir}/schema/sudo.ldif"        \
-  "${slapd_conf_dir}/schema/dnsdomain2.ldif"
+  "${slapd_conf_dir}/schema/dnsdomain2.ldif"  \
+  "${slapd_conf_dir}/schema/mailservice.ldif"
 
 # Create the directories for the LDAP databases.
 install_directory -m 0770 -o "$slapd_user" -g "$slapd_user" \

@@ -1,0 +1,40 @@
+#!/bin/sh
+
+# Apache Tika is used by dovecot for indexing text content in attachments.
+
+pkg install -y curl openjdk17
+
+# Create local tika user.
+pw groupshow "$tika_user" \
+  || pw groupadd "$tika_user" -g "$tika_uid"
+
+# Create local tika group.
+pw usershow "$tika_user"     \
+  || pw useradd "$tika_user" \
+       -u "$tika_uid"        \
+       -g "$tika_user"       \
+       -c 'Apache Tika'      \
+       -d "$tika_data_dir"   \
+       -s /usr/sbin/nologin
+
+# Create tika install/config directories.
+install_directory -m 0755 \
+  "$tika_install_dir"     \
+  "$tika_conf_dir"
+
+# Create tika user's home directory.
+install_directory -m 0770 -o "$tika_user" -g "$tika_user" "$tika_data_dir"
+
+# Download tika jar file.
+curl -fL -o "${tika_install_dir}/tika.jar" "$tika_url"
+
+# Copy tika rc script.
+install_file -m 0555 /usr/local/etc/rc.d/tika
+
+# Copy tika config files.
+install_template -m 0644 "${tika_conf_dir}/config.xml"
+install_file -m 0644 "${tika_conf_dir}/log4j2.xml"
+
+# Enable and start tika.
+sysrc -v tika_enable=YES
+service tika restart

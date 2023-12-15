@@ -73,7 +73,7 @@ associatedDomain: $(ip2rdns "$BOXCONF_DEFAULT_IPV4")
 EOF
 
 # Create host keytab.
-get_keytab "host/${fqdn}" "${keytab_dir}/host.keytab"
+get_keytab "${keytab_dir}/host.keytab" "host/${fqdn}"
 ln -snfv "${keytab_dir}/host.keytab" /etc/krb5.keytab
 
 # Create group for accessing system ccache.

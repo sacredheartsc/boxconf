@@ -1,0 +1,16 @@
+uris = ${ldap_uri}
+
+sasl_bind = yes
+sasl_mech = gssapi
+sasl_realm = ${realm}
+
+base = ${accounts_basedn}
+user_filter = (&(uid=%Ln)(memberOf=cn=${mail_access_role},${roles_basedn}))
+user_attrs = \
+  =uid=${dovecot_vmail_user}, \
+  =gid=${dovecot_vmail_user}, \
+  =home=${dovecot_vmail_dir}/%{ldap:uid} \
+  mailQuota=quota_rule=\*:storage=%{ldap:mailQuota}
+
+iterate_attrs = uid=user
+iterate_filter = (memberOf=cn=${mail_access_role},${roles_basedn})

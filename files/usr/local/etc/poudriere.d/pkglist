@@ -16,6 +16,7 @@ editors/vim@tiny
 graphics/ImageMagick7@nox11
 graphics/p5-Image-ExifTool
 irc/znc
+java/openjdk17
 mail/dma
 mail/dovecot
 mail/dovecot-pigeonhole
@@ -56,7 +57,6 @@ sysutils/rsyslog8
 sysutils/stow
 sysutils/tmux
 sysutils/tree
-textproc/apache-solr
 textproc/jq
 www/nginx
 www/sabredav

@@ -1,7 +1,0 @@
-version = 3
-bind = sasl
-sasl_mechs = gssapi
-server_host = ${ldap_uri}
-search_base = ${accounts_basedn}
-query_filter = (&(krb5PrincipalName=%s)(memberOf=cn=${postfix_recipient_group},${groups_basedn}))
-result_attribute = krb5PrincipalName

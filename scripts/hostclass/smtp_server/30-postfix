@@ -11,8 +11,8 @@ get_keytab           \
   -o root            \
   -g "$postfix_user" \
   -m 0640            \
-  "smtp/${fqdn}"     \
-  "$postfix_keytab"
+  "$postfix_keytab"  \
+  "smtp/${fqdn}"
 
 # Generate dhparams.
 [ -f "$postfix_dhparams" ] || openssl dhparam -out "$postfix_dhparams" 2048
@@ -21,7 +21,9 @@ get_keytab           \
 install_template -m 0644                     \
   "${postfix_conf_dir}/main.cf"              \
   "${postfix_conf_dir}/virtual_mailboxes.cf" \
-  "${postfix_conf_dir}/virtual_aliases.cf"
+  "${postfix_conf_dir}/virtual_aliases.cf"   \
+  "${postfix_conf_dir}/virtual_domains.cf"
+
 install_file -m 0644 "${postfix_conf_dir}/master.cf"
 
 # Copy TLS certificate for SMTP server.

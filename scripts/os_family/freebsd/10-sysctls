@@ -63,6 +63,6 @@ if [ "$BOXCONF_VIRTUALIZATION_TYPE" != jail ]; then
   # FreeBSD automatically scales kern.maxfilesperproc with the amount of memory.
   # On systems with large amounts of RAM, this can cause strange lags with some 
   # applications that attempt to close every possible file descriptor.
-  # Therefore, we arbitrarily cap this value at 10240.
-  [ "$(sysctl -n kern.maxfilesperproc)" -le 10240 ] || set_sysctl kern.maxfilesperproc=10240
+  # Therefore, we arbitrarily cap this value at 65535.
+  [ "$(sysctl -n kern.maxfilesperproc)" -le 65535 ] || set_sysctl kern.maxfilesperproc=65535
 fi

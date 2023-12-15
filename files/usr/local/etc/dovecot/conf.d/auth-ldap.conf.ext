@@ -1,0 +1,4 @@
+userdb {
+  driver = ldap
+  args = ${dovecot_conf_dir}/dovecot-ldap.conf.ext
+}

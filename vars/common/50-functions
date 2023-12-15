@@ -23,7 +23,7 @@ boxconf_kinit(){
 }
 
 get_keytab(){
-  # $1 = princ, $2 = keytab
+  # $1 = keytab, $2..$n = princ
 
   _gkt_owner=0
   _gkt_group=0
@@ -38,20 +38,32 @@ get_keytab(){
   done
   shift $((OPTIND - 1))
 
-  # If the keytab exists, check if kinit succeeds with the given principal.
-  if [ -f "$2" ]; then
-    chmod "$_gkt_mode" "$2"
-    chown "$_gkt_owner" "$2"
-    chgrp "$_gkt_group" "$2"
-    kinit -c "$boxconf_test_ccache" -t "$2" "$1" true && return 0
+  _gkt_keytab=$1; shift
+
+  # Set permissions on the keytab file.
+  if [ -f "$_gkt_keytab" ]; then
+    chmod "$_gkt_mode" "$_gkt_keytab"
+    chown "$_gkt_owner" "$_gkt_keytab"
+    chgrp "$_gkt_group" "$_gkt_keytab"
   else
-    install -Cv -m "$_gkt_mode" -o "$_gkt_owner" -g "$_gkt_group" /dev/null "$2"
+    install -Cv -m "$_gkt_mode" -o "$_gkt_owner" -g "$_gkt_group" /dev/null "$_gkt_keytab"
   fi
 
-  # If not, reset the keys.
+  # Acquire kadmin service ticket.
   printf '%s' "$boxconf_password" \
-    | kinit -c "$boxconf_ccache" -S "kadmin/admin@${realm}" --password-file=STDIN "${boxconf_user}@${realm}" \
-      && KRB5CCNAME="$boxconf_ccache" ktutil -v -k "$2" get -p "${boxconf_user}@${realm}" "${1}@${realm}"
+    | kinit -c "$boxconf_ccache" -S "kadmin/admin@${realm}" --password-file=STDIN "${boxconf_user}@${realm}"
+
+  # For each principal...
+  while [ $# -gt 0 ]; do
+    if kinit -c "$boxconf_test_ccache" -t "$_gkt_keytab" "$1" true; then
+      # If the keytab is valid for the principal, continue.
+      shift; continue
+    else
+      # Otherwise, reset the keys and store them in the keytab.
+      KRB5CCNAME="$boxconf_ccache" ktutil -v -k "$_gkt_keytab" get -p "${boxconf_user}@${realm}" "${1}@${realm}"
+    fi
+    shift
+  done
 }
 
 boxconf_kadmin(){
@@ -83,7 +95,8 @@ ldap_delete(){
 }
 
 create_krb5_service(){
-  ldap_add "cn=${1},${services_basedn}" <<EOF
+  while [ $# -gt 0 ]; do
+    ldap_add "cn=${1},${services_basedn}" <<EOF
 objectClass: applicationProcess
 objectClass: krb5Principal
 objectClass: krb5KDCEntry
@@ -94,4 +107,6 @@ krb5KDCFlags: ${krb5_default_princ_flags}
 krb5MaxLife: ${krb5_max_ticket_lifetime}
 krb5MaxRenew: ${krb5_max_renew_lifetime}
 EOF
+    shift
+  done
 }

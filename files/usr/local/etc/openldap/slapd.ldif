@@ -55,10 +55,10 @@ include: file://${slapd_conf_dir}/schema/inetorgperson.ldif
 include: file://${slapd_conf_dir}/schema/dyngroup.ldif
 include: file://${slapd_conf_dir}/schema/rfc2307bis.ldif
 include: file://${slapd_conf_dir}/schema/heimdal.ldif
-include: file://${slapd_conf_dir}/schema/misc.ldif
 include: file://${slapd_conf_dir}/schema/openssh-lpk.ldif
 include: file://${slapd_conf_dir}/schema/sudo.ldif
 include: file://${slapd_conf_dir}/schema/dnsdomain2.ldif
+include: file://${slapd_conf_dir}/schema/mailservice.ldif
 
 # cn=config database configuration.
 dn: olcDatabase={0}config,cn=config
@@ -92,7 +92,7 @@ $(printf "olcSyncrepl: rid=00%s
   syncdata=accesslog\n" ${slapd_server_ids})
 olcMultiProvider: TRUE
 olcDbIndex: objectClass eq
-olcDbIndex: cn,uid,uidNumber,gidNumber,member,memberUid,mail,mailLocalAddress eq
+olcDbIndex: cn,uid,uidNumber,gidNumber,member,memberUid,mail,mailAddress,mailAlternateAddress,mailPrivateAddress,mailContactAddress eq
 olcDbIndex: krb5PrincipalName eq,pres
 olcDbIndex: entryCSN,entryUUID eq
 olcDbIndex: associatedDomain pres,eq,sub
@@ -195,8 +195,13 @@ dn: olcOverlay={3}unique,olcDatabase={1}mdb,cn=config
 objectClass: olcOverlayConfig
 objectClass: olcUniqueConfig
 olcOverlay: unique
-olcUniqueURI: ldap:///${accounts_basedn}?mail,uid,uidNumber,gidNumber,krb5PrincipalName,mailLocalAddress?sub
+olcUniqueURI: ldap:///${accounts_basedn}?uid?sub
+olcUniqueURI: ldap:///${accounts_basedn}?uidNumber?sub
+olcUniqueURI: ldap:///${accounts_basedn}?krb5PrincipalName?sub
+olcUniqueURI: ldap:///${accounts_basedn}?mail?sub
+olcUniqueURI: ldap:///${accounts_basedn}?mailAddress,mailAlternateAddress,mailPrivateAddress,mailContactAddress?sub
 olcUniqueURI: ldap:///${groups_basedn}?cn?sub
+olcUniqueURI: ldap:///${groups_basedn}?gidNumber?sub
 olcUniqueURI: ldap:///${hosts_basedn}?cn,dc?sub
 olcUniqueURI: ldap:///${services_basedn}?cn?sub
 olcUniqueURI: ldap:///${sudo_basedn}?cn?sub

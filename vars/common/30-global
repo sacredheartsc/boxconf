@@ -20,12 +20,14 @@ people_basedn="ou=people,${accounts_basedn}"
 robots_basedn="ou=robots,${accounts_basedn}"
 hosts_basedn="ou=hosts,${accounts_basedn}"
 services_basedn="ou=services,${accounts_basedn}"
-groups_basedn="ou=groups,${basedn}"
+groups_basedn="ou=groups,${accounts_basedn}"
 private_groups_basedn="ou=userprivate,${groups_basedn}"
 roles_basedn="ou=roles,${groups_basedn}"
 automount_basedn="ou=automount,${basedn}"
 sudo_basedn="ou=sudo,${basedn}"
 dns_basedn="ou=dns,${basedn}"
+mail_basedn="ou=mail,${basedn}"
+mail_domains_basedn="ou=domains,${mail_basedn}"
 
 nslcd_min_uid=1000
 nscd_ttl=600
@@ -48,6 +50,14 @@ nginx_worker_processes=$nproc
 nginx_nofile=2048
 nginx_worker_connections=768
 nginx_ssl_ciphers='ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-CHACHA20-POLY1305'
+
+mail_access_role=mail-access
+
+rspamd_host='smtp'
+imap_host='imap'
+lmtp_port=25
+quota_status_port=10993
+rspamd_port=11334
 
 # The poudriere server must be built before the IDM servers, which results
 # in a chicken-and-egg problem with DNS. When the $no_idm extra var is set,

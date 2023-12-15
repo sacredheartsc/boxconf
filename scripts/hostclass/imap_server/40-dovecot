@@ -1,0 +1,101 @@
+#!/bin/sh
+
+pkg install -y dovecot dovecot-pigeonhole rspamd
+
+# Create local vmail group.
+pw groupshow "$dovecot_vmail_user" \
+  || pw groupadd "$dovecot_vmail_user" -g "$dovecot_vmail_uid"
+
+# Create local vmail group.
+pw usershow "$dovecot_vmail_user"     \
+  || pw useradd "$dovecot_vmail_user" \
+       -u "$dovecot_vmail_uid"        \
+       -g "$dovecot_vmail_user"       \
+       -c 'Virtual Mail User'         \
+       -d "$dovecot_vmail_dir"        \
+       -s /usr/sbin/nologin
+
+# Create ZFS dataset for virtual maildirs.
+create_dataset -o "mountpoint=${dovecot_vmail_dir}" "${state_dataset}/mailboxes"
+
+# Set ownership on vmail dir.
+install_directory -m 0770 -o "$dovecot_vmail_user" -g "$dovecot_vmail_user" "$dovecot_vmail_dir"
+
+# Create service principals and keytab.
+create_krb5_service "imap/${fqdn}" "sieve/${fqdn}"
+get_keytab           \
+  -o root            \
+  -g "$dovecot_user" \
+  -m 0640            \
+  "$dovecot_keytab"  \
+  "imap/${fqdn}"     \
+  "sieve/${fqdn}"
+
+# Generate dhparams.
+[ -f "$dovecot_dhparams" ] || openssl dhparam -out "$dovecot_dhparams" 2048
+
+# Create dovecot directories.
+install_directory -m 0755       \
+  "${dovecot_conf_dir}/conf.d"  \
+  "$dovecot_sieve_before_dir"   \
+  "$dovecot_sieve_pipe_bin_dir"
+
+# Generate dovecot configuration.
+install_template -m 0644                                 \
+  "${dovecot_conf_dir}/dovecot.conf"                     \
+  "${dovecot_conf_dir}/dovecot-ldap.conf.ext"            \
+  "${dovecot_conf_dir}/conf.d/10-auth.conf"              \
+  "${dovecot_conf_dir}/conf.d/10-mail.conf"              \
+  "${dovecot_conf_dir}/conf.d/10-master.conf"            \
+  "${dovecot_conf_dir}/conf.d/10-ssl.conf"               \
+  "${dovecot_conf_dir}/conf.d/15-lda.conf"               \
+  "${dovecot_conf_dir}/conf.d/90-fts.conf"               \
+  "${dovecot_conf_dir}/conf.d/90-quota.conf"             \
+  "${dovecot_conf_dir}/conf.d/90-sieve.conf"             \
+  "${dovecot_conf_dir}/conf.d/90-sieve-extprograms.conf" \
+  "${dovecot_conf_dir}/conf.d/auth-ldap.conf.ext"
+
+install_template -m 0550 -o root -g "$dovecot_user" \
+  "${dovecot_sieve_pipe_bin_dir}/report-spam.sh"    \
+  "${dovecot_sieve_pipe_bin_dir}/report-ham.sh"     \
+
+install_file -m 0555 \
+  "${dovecot_script_dir}/quota-warning.sh"
+
+install_file -m 0644                                \
+  "${dovecot_conf_dir}/conf.d/15-mailboxes.conf"    \
+  "${dovecot_conf_dir}/conf.d/20-imap.conf"         \
+  "${dovecot_conf_dir}/conf.d/20-lmtp.conf"         \
+  "${dovecot_conf_dir}/conf.d/20-managesieve.conf"  \
+  "${dovecot_conf_dir}/conf.d/auth-system.conf.ext" \
+  "${dovecot_conf_dir}/report-ham.sieve"            \
+  "${dovecot_conf_dir}/report-spam.sieve"           \
+  "${dovecot_sieve_before_dir}/10-rspamd.sieve"
+
+# Create dovecot PAM service.
+install_file -m 0644 /etc/pam.d/dovecot
+
+# Compile sieve scripts.
+sievec "${dovecot_conf_dir}/report-ham.sieve"
+sievec "${dovecot_conf_dir}/report-spam.sieve"
+sievec "${dovecot_sieve_before_dir}/10-rspamd.sieve"
+
+# Copy TLS certificate for dovecot.
+install_certificate     -m 0644 -o root -g "$dovecot_user" "$fqdn" "$dovecot_tls_cert"
+install_certificate_key -m 0640 -o root -g "$dovecot_user" "$fqdn" "$dovecot_tls_key"
+
+# Enable and start dovecot and dependencies.
+sysrc -v                                  \
+  dovecot_enable=YES                      \
+  kstart_instances+=dovecot               \
+  kstart_dovecot_keytab="$dovecot_keytab" \
+  kstart_dovecot_flags="-aLK 120 -g ${dovecot_user} -o ${dovecot_user} -k /tmp/krb5cc_$(id -u "$dovecot_user") -u imap/${fqdn}"
+
+service kstart restart
+service dovecot restart
+
+# Create mail access role.
+ldap_add "cn=${mail_access_role},${roles_basedn}" <<EOF
+objectClass: groupOfMembers
+cn: ${mail_access_role}
+EOF

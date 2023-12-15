@@ -85,6 +85,24 @@ objectClass: organizationalUnit
 ou: $(rdn "$dns_basedn")
 EOF
 
+# The mail OU.
+ldap_add "$mail_basedn" <<EOF
+objectClass: organizationalUnit
+ou: $(rdn "$mail_basedn")
+EOF
+
+# The mail domains OU.
+ldap_add "$mail_domains_basedn" <<EOF
+objectClass: organizationalUnit
+ou: $(rdn "$mail_domains_basedn")
+EOF
+
+# The email domain (for postfix virtual_domains).
+ldap_add "dc=${email_domain},${mail_domains_basedn}" <<EOF
+objectClass: dNSDomain
+dc: ${email_domain}
+EOF
+
 # Forward DNS zone.
 ldap_add "dc=${domain},${dns_basedn}" <<EOF
 objectClass: dNSDomain

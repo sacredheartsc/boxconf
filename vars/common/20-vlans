@@ -1,31 +1,42 @@
 #!/bin/sh
 
-# VLANs and subnets are defined in this file.
-# We also detect the current VLAN and set VLAN-specific variables.
+# Detect the current VLAN and set VLAN-specific variables.
 
-vlan_ids='130 199'
+_cidr2rdns(){
+  _c2r_mask=$(( 0xFFFFFFFF << (32 - ${1#*/}) ))
+  _c2r_a=${1%%.*}; set ${1#*.}
+  _c2r_b=${1%%.*}; set ${1#*.}
+  _c2r_c=${1%%.*}; set ${1#*.}
+  _c2r_d=${1%%/*}
 
-vlan130_cidr='10.11.130.0/24'
-vlan130_gateway='10.11.130.1'
-vlan130_ntp_servers='10.11.130.1'
+  _c2r_first=$(( ((_c2r_b << 16) + (_c2r_c << 8) + _c2r_d) & _c2r_mask ))
+  _c2r_last=$(( (_c2r_first | ~_c2r_mask) & 0x7FFFFFFF ))
 
-vlan199_cidr='10.11.199.0/24'
-vlan199_gateway='10.11.199.1'
-vlan199_ntp_servers='10.11.199.1'
+  for _c2r_i in $(seq "$_c2r_first" "$_c2r_last"); do
+    echo "$(((_c2r_i & 0xFF00) >> 8)).$(((_c2r_i & 0xFF0000) >> 16)).${_c2r_a}.in-addr.arpa"
+  done | uniq
+}
 
 for vlan_id in $vlan_ids; do
-  # Check if our current IP matches the vlan.
-  ipv4_cidr=$(eval "echo \"\$vlan${vlan_id}_cidr\"")
-  ip_in_subnet "$BOXCONF_DEFAULT_IPV4" "$ipv4_cidr" || continue
+  # Construct additional network-related vars for the VLAN.
+  eval "vlan${vlan_id}_network=\${vlan${vlan_id}_cidr%/*}"
+  eval "vlan${vlan_id}_prefix=\${vlan${vlan_id}_cidr#*/}"
+  eval "vlan${vlan_id}_netmask=\$(prefix2netmask \"\$vlan${vlan_id}_prefix\")"
 
-  # Set network-releated vars.
-  ipv4_address=$BOXCONF_DEFAULT_IPV4
-  ipv4_prefix=${ipv4_cidr#*/}
-  ipv4_network=${ipv4_cidr%/*}
-  ipv4_netmask=$(prefix2netmask "$ipv4_prefix")
-  eval "ipv4_gateway=\$vlan${vlan_id}_gateway"
-  eval "ntp_servers=\$vlan${vlan_id}_ntp_servers"
-  break
+  # Update global vars.
+  eval "postfix_mynetworks=\"\${postfix_mynetworks:-}\${vlan${vlan_id}_cidr} \""
+  eval "reverse_dns_zones=\"\${reverse_dns_zones:-}\$(_cidr2rdns \"\$vlan${vlan_id}_cidr\") \""
+
+  # If our current IP matches the vlan, set ipv4_ vars.
+  if eval "ip_in_subnet \${BOXCONF_DEFAULT_IPV4} \${vlan${vlan_id}_cidr}"; then
+    eval "ipv4_cidr=\$vlan${vlan_id}_cidr"
+    ipv4_address=$BOXCONF_DEFAULT_IPV4
+    ipv4_prefix=${ipv4_cidr#*/}
+    ipv4_network=${ipv4_cidr%/*}
+    ipv4_netmask=$(prefix2netmask "$ipv4_prefix")
+    eval "ipv4_gateway=\$vlan${vlan_id}_gateway"
+    eval "ntp_servers=\$vlan${vlan_id}_ntp_servers"
+  fi
 done
 
 [ -n "${ipv4_gateway:-}" ] || die "no vlan defined for ip: ${BOXCONF_DEFAULT_IPV4}"
