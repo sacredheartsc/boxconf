@@ -1,3 +1,4 @@
 #!/bin/sh
 
+acme_standalone=true
 allowed_tcp_ports="ssh smtp submission ${rspamd_port}"

@@ -1,0 +1,92 @@
+#!/bin/sh
+
+# This file provides the get_acme_certificate function for FreeBSD hosts,
+# which uses acme.sh to obtain TLS certificates from ZeroSSL.
+#
+# If acme_standalone=true is set, then standalone verification will be used.
+# The default pf.conf will redirect all TCP traffic on port 80 to $acme_standalone_port.
+# This allows acme.sh to run without needing root privileges.
+#
+# If you create a ZeroSSL account and set the $acme_eab_kid and $acme_eab_hmac_key
+# variables, then you can view all your issued certificates in the ZeroSSL
+# dashboard.
+#
+# Otherwise, a random ZeroSSL account will be generated for you using $acme_email.
+
+acme_cert_dir=/usr/local/etc/ssl/acme
+acme_user=acme
+acme_home=/var/db/acme
+
+get_acme_certificate(){
+  _gac_group=0
+  _gac_webroot=/var/www/html
+  _gac_keylength=ec-256
+  _gac_common_args="--home ${acme_home} --log /dev/null --syslog 6"
+
+  _gac_cert_path=
+  _gac_key_path=
+  _gac_reload_cmd=
+
+  while getopts c:g:k:r: _gac_opt; do
+    case $_gac_opt in
+      c) _gac_cert_path=$OPTARG ;;
+      g) _gac_group=$OPTARG ;;
+      k) _gac_key_path=$OPTARG ;;
+      r) _gac_reload_cmd=$OPTARG ;;
+      w) _gac_webroot=$OPTARG ;;
+      *) bug "get_acme_cert: invalid option: ${_gac_opt}"
+    esac
+  done
+
+  shift $((OPTIND - 1))
+  _gac_name=$1
+
+  ### Install package, set up cron job.
+  pkg install -y acme.sh
+  install_directory -m 0775 -o root -g "$acme_user" "$acme_cert_dir"
+  install_template -m 0644 /etc/cron.d/acme
+
+  ### Register the ZeroSSL account.
+  if [ -n "${acme_eab_kid:-}" ]; then
+    _gac_register_args="--eab-kid ${acme_eab_kid} --eab-hmac-key ${acme_eab_hmac_key}"
+  else
+    _gac_register_args="--email ${acme_email}"
+  fi
+
+  su -m "$acme_user" -c "acme.sh ${_gac_common_args} --register-account ${_gac_register_args}"
+
+  ### Acquire the certificate via HTTP ACME challenge.
+  if [ "$acme_standalone" = true ]; then
+    _gac_issue_args="--standalone --httpport ${acme_standalone_port}"
+  else
+    _gac_issue_args="-w ${_gac_webroot}"
+  fi
+
+  for _gac_domain; do
+    _gac_issue_args="${_gac_issue_args} -d ${_gac_domain}"
+  done
+
+  su -m "$acme_user" -c "acme.sh ${_gac_common_args} --issue --keylength ${_gac_keylength} ${_gac_issue_args}" && _gac_rc=$? || _gac_rc=$?
+
+  case $_gac_rc in
+    0) ;; # New cert was issued.
+    2) ;; # Cert was unchanged.
+    *) die 'failed to issue certificate' ;;
+  esac
+
+  ### Install the certificate to the requested location.
+  if [ -f "$_gac_key_path" ]; then
+    chmod 640 "$_gac_key_path"
+    chown "${acme_user}:${_gac_group}" "$_gac_key_path"
+  else
+    install -o "$acme_user" -g "$_gac_group" -m 0640 /dev/null "$_gac_key_path"
+  fi
+
+  _gac_install_args="--domain ${_gac_name} --key-file ${_gac_key_path} --fullchain-file ${_gac_cert_path}"
+
+  if [ -n "$_gac_reload_cmd" ]; then
+    _gac_install_args="${_gac_install_args} --reloadcmd '${_gac_reload_cmd}'"
+  fi
+
+  su -m "$acme_user" -c "acme.sh ${_gac_common_args} --install-cert ${_gac_install_args}"
+}

@@ -26,15 +26,20 @@ install_template -m 0644                     \
 
 install_file -m 0644 "${postfix_conf_dir}/master.cf"
 
-# Copy TLS certificate for SMTP server.
-install_certificate     -m 0644 -o root -g "$postfix_user" "$fqdn" "$postfix_tls_cert"
-install_certificate_key -m 0640 -o root -g "$postfix_user" "$fqdn" "$postfix_tls_key"
-
 # Copy postfix SASL configuration.
 install_template -m 0644 /usr/local/lib/sasl2/smtpd.conf
 
 # Allow postfix to read the saslauthd socket.
 install_directory -m 0750 -o "$saslauthd_user" -g "$postfix_user" "$saslauthd_runtime_dir"
+
+# Acquire public TLS certificate.
+install_file /usr/local/etc/sudoers.d/acme
+get_acme_certificate               \
+  -c "$postfix_tls_cert"           \
+  -k "$postfix_tls_key"            \
+  -g "$postfix_user"               \
+  -r 'sudo service postfix reload' \
+  "$postfix_myhostname"
 
 # Enable and start postfix and dependencies.
 sysrc -v                                  \

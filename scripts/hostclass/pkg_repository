@@ -8,6 +8,7 @@
 : ${poudriere_versions:='13.2-RELEASE'}
 : ${poudriere_jobs:="$nproc"}
 : ${poudriere_dataset:="${state_dataset:-zroot}"}
+: ${poudriere_allow_make_jobs_packages:='ImageMagick* chromium cmake ffmpeg firefox gcc* gnutls icu llvm* mongodb* node* openjdk* pkg qt*-webengine rust'}
 
 poudriere_data_dir=/usr/local/poudriere
 poudriere_conf_dir=/usr/local/etc/poudriere.d
@@ -20,9 +21,11 @@ pkg install -y \
   nginx
 
 # Generate poudriere configuration.
-install_template -m 0644 /usr/local/etc/poudriere.conf
+install_template -m 0644           \
+  /usr/local/etc/poudriere.conf    \
+ "${poudriere_conf_dir}/make.conf"
 install_file -m 0400 /usr/local/etc/ssl/repo.key
-install_file -m 0644 "${poudriere_conf_dir}/make.conf" "${poudriere_conf_dir}/pkglist"
+install_file -m 0644 "${poudriere_conf_dir}/pkglist"
 install_directory -m 0755 /usr/ports/distfiles
 
 # Configure and enable nginx to serve the packages.

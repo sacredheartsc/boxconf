@@ -17,6 +17,19 @@ krb5KDCFlags: ${kdc_default_princ_flags}
 krb5MaxLife: ${kdc_max_ticket_lifetime}
 krb5MaxRenew: ${kdc_max_renew_lifetime}
 $(cat /etc/ssh/ssh_host_*_key.pub | cut -d' ' -f-2 | sed 's/^/sshPublicKey: /')
+description: $(uname -mrs) ${BOXCONF_HOSTCLASS}
+EOF
+
+ldap_modify "dc=${BOXCONF_HOSTNAME},${hosts_basedn}" <<EOF
+replace: sshPublicKey
+$(cat /etc/ssh/ssh_host_*_key.pub | cut -d' ' -f-2 | sed 's/^/sshPublicKey: /')
+-
+replace: description
+description: $(uname -mrs) ${BOXCONF_HOSTCLASS}
+-
+replace: associatedDomain
+$(printf "associatedDomain: %s.${domain}\n" "$BOXCONF_HOSTNAME" ${cnames:-})
+associatedDomain: $(ip2rdns "$BOXCONF_DEFAULT_IPV4")
 EOF
 
 # LDAP service principal for slapd.

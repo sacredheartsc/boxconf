@@ -41,5 +41,3 @@ case $BOXCONF_VIRTUALIZATION_TYPE in
     state_dataset=${state_dataset:+${state_dataset}/data}
     ;;
 esac
-
-# vi: ft=sh

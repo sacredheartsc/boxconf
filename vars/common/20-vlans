@@ -3,6 +3,7 @@
 # Detect the current VLAN and set VLAN-specific variables.
 
 _cidr2rdns(){
+  # Convert a CIDR to a list of reverse DNS zones.
   _c2r_mask=$(( 0xFFFFFFFF << (32 - ${1#*/}) ))
   _c2r_a=${1%%.*}; set ${1#*.}
   _c2r_b=${1%%.*}; set ${1#*.}
