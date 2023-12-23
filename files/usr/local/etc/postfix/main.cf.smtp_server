@@ -65,20 +65,24 @@ smtp_tls_loglevel               = 1
 smtpd_helo_required = yes
 smtpd_client_restrictions =
   permit_mynetworks,
+  permit_sasl_authenticated,
   reject_unauth_pipelining,
   reject_unknown_reverse_client_hostname
 smtpd_helo_restrictions =
   permit_mynetworks,
+  permit_sasl_authenticated,
   reject_invalid_helo_hostname,
   reject_non_fqdn_helo_hostname,
   reject_unauth_pipelining
 smtpd_sender_restrictions =
   permit_mynetworks,
+  permit_sasl_authenticated,
   reject_non_fqdn_sender,
   reject_unknown_sender_domain,
   reject_unauth_pipelining
 smtpd_relay_restrictions =
   permit_mynetworks,
+  permit_sasl_authenticated,
   reject_unauth_destination
 smtpd_recipient_restrictions =
   reject_unknown_recipient_domain,
@@ -86,10 +90,12 @@ smtpd_recipient_restrictions =
   reject_unauth_destination,
   check_policy_service inet:${imap_host}.${domain}:${quota_status_port},
   permit_mynetworks,
+  permit_sasl_authenticated,
   reject_non_fqdn_recipient,
   reject_unauth_pipelining
 smtpd_data_restrictions =
   permit_mynetworks,
+  permit_sasl_authenticated,
   reject_unauth_pipelining
 
 virtual_transport       = lmtp:inet:${imap_host}.${domain}:${lmtp_port}

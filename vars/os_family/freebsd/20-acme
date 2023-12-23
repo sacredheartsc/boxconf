@@ -15,6 +15,7 @@
 
 acme_cert_dir=/usr/local/etc/ssl/acme
 acme_user=acme
+acme_uid=169
 acme_home=/var/db/acme
 
 get_acme_certificate(){

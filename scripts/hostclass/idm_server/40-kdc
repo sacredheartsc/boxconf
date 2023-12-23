@@ -1,6 +1,6 @@
 #!/bin/sh
 
-pkg install -y heimdal
+pkg install -y heimdal-devel
 
 # Generate the system kerberos configuration.
 install_template -m 0644 /etc/krb5.conf

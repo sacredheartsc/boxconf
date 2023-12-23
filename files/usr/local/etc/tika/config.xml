@@ -1,6 +1,7 @@
 <properties>
   <server>
     <params>
+      <javaPath>/usr/local/bin/java</javaPath>
       <returnStackTrace>false</returnStackTrace>
       <forkedJvmArgs>
         <arg>-Xmx${tika_heap_size}</arg>
@@ -9,6 +10,7 @@
         <arg>-XX:+ParallelRefProcEnabled</arg>
         <arg>-XX:MaxGCPauseMillis=250</arg>
         <arg>-XX:+AlwaysPreTouch</arg>
+        <arg>-Dlog4j.configurationFile=${tika_conf_dir}/log4j2.xml</arg>
       </forkedJvmArgs>
       <endpoints>
         <endpoint>tika</endpoint>

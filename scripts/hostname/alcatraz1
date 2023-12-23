@@ -2,8 +2,8 @@
 
 sysrc -v \
   defaultrouter=10.11.130.1 \
-  ifconfig_ixl0=up \
-  ifconfig_ixl1=up \
+  ifconfig_ixl0='up -lro' \
+  ifconfig_ixl1='up -lro' \
   cloned_interfaces+="lagg0 vlan130 bridge130" \
   ifconfig_lagg0="laggproto lacp laggport ixl0 laggport ixl1 lagghash l3,l4" \
   ifconfig_vlan130="vlan 130 vlandev lagg0" \

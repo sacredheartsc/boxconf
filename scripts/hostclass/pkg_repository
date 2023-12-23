@@ -5,13 +5,17 @@
 #   openssl rsa -in files/usr/local/etc/ssl/repo.key -pubout -out files/usr/local/etc/ssl/repo.crt
 #   ./vault encrypt files/usr/local/etc/ssl/repo.key
 
-: ${poudriere_versions:='13.2-RELEASE'}
+: ${poudriere_versions:='14.0-RELEASE'}
 : ${poudriere_jobs:="$nproc"}
 : ${poudriere_dataset:="${state_dataset:-zroot}"}
-: ${poudriere_allow_make_jobs_packages:='ImageMagick* chromium cmake ffmpeg firefox gcc* gnutls icu llvm* mongodb* node* openjdk* pkg qt*-webengine rust'}
+: ${poudriere_make_jobs_number:='4'}
+: ${poudriere_allow_make_jobs_packages:='ImageMagick* cargo-c *chromium* cmake cmake-core eclipse electron* ffmpeg firefox gcc* gnutls gtk3* icu libreoffice* llvm* mongodb* mysql*-client mysql*-server node* openjdk* openssl pkg qt*-webengine rust webkit* vaultwarden'}
 
 poudriere_data_dir=/usr/local/poudriere
 poudriere_conf_dir=/usr/local/etc/poudriere.d
+
+# Create poudriere config dataset.
+create_dataset -o "mountpoint=${poudriere_conf_dir}" "${state_dataset}/poudriere-config"
 
 # These packages are needed to bootstrap poudriere. On the first run, they'll
 # be installed from the public FreeBSD repos.

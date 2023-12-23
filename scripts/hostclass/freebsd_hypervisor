@@ -9,10 +9,12 @@ jail_dataset=tank/jails
 set_sysctl net.link.tap.up_on_open=1
 
 # Load required kernel modules.
-load_kernel_module vmm nmdm
+load_kernel_module vmm nmdm linux linux64
 set_loader_conf       \
   vmm_load=YES        \
   nmdm_load=YES       \
+  linux_load=YES      \
+  linux64_load=YES    \
   kern.racct.enable=1
 
 # Install pkg dependencies.

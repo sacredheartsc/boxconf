@@ -1,8 +1,19 @@
 #!/bin/sh
 
+case $BOXCONF_OS_VERSION in
+  13.*)
+    set_sysctl                      \
+      net.inet.ip.check_interface=1 \
+      net.inet.tcp.rfc6675_pipe=1
+    ;;
+  *)
+    set_sysctl \
+      net.inet.ip.rfc1122_strong_es=1
+    ;;
+esac
+
 set_sysctl                                    \
   net.inet.icmp.drop_redirect=1               \
-  net.inet.ip.check_interface=1               \
   net.inet.ip.process_options=0               \
   net.inet.ip.random_id=1                     \
   net.inet.ip.redirect=0                      \
@@ -24,7 +35,6 @@ set_sysctl                                    \
   net.inet.tcp.path_mtu_discovery=0           \
   net.inet.tcp.recvbuf_max="$tcp_buffer_size" \
   net.inet.tcp.recvspace=65536                \
-  net.inet.tcp.rfc6675_pipe=1                 \
   net.inet.tcp.sendbuf_inc=65536              \
   net.inet.tcp.sendbuf_max="$tcp_buffer_size" \
   net.inet.tcp.sendspace=65536                \

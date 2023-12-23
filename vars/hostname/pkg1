@@ -1,3 +1,4 @@
 #!/bin/sh
 
 cnames=pkg
+poudriere_make_jobs_number=8

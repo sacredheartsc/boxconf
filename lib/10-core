@@ -121,7 +121,7 @@ _boxconf_run(){
   # Determine OS distribution.
   if [ -f /etc/os-release ]; then
     BOXCONF_OS_DISTRIBUTION=$(. /etc/os-release; printf '%s' "$ID")
-    BOXCONF_OS_VERSION=$(. /etc/os-release; printf '%s' "$VERSION")
+    BOXCONF_OS_VERSION=$(. /etc/os-release; printf '%s' "$VERSION_ID")
   else
     die 'unknown os distribution'
   fi

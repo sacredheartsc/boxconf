@@ -79,3 +79,8 @@ dn_exists(){
 ldap_add(){
   dn_exists "$1" || { printf 'dn: %s\n' "$1"; cat; } | ldapadd -Q -H ldapi:/// -Y EXTERNAL
 }
+
+ldap_modify(){
+  _ldapm_dn=$1; shift
+  { printf 'dn: %s\nchangetype: modify\n' "$_ldapm_dn"; cat; } | ldapmodify -Q -H ldapi:/// -Y EXTERNAL "$@"
+}

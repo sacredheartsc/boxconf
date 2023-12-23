@@ -98,6 +98,7 @@ service nscd restart
 pw usershow "$ssh_authorized_keys_user" > /dev/null 2>&1 \
   || pw useradd "$ssh_authorized_keys_user" -u "$ssh_authorized_keys_uid" -g "$system_ccache_group"
 
+install_directory -m 0755 /usr/local/libexec
 install_template -m 0555                     \
   /usr/local/libexec/idm-ssh-known-hosts     \
   /usr/local/libexec/idm-ssh-authorized-keys
