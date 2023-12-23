@@ -55,11 +55,8 @@ get_keytab(){
 
   # For each principal...
   while [ $# -gt 0 ]; do
-    if kinit -c "$boxconf_test_ccache" -t "$_gkt_keytab" "$1" true; then
-      # If the keytab is valid for the principal, continue.
-      shift; continue
-    else
-      # Otherwise, reset the keys and store them in the keytab.
+    if ! kinit -c "$boxconf_test_ccache" -t "$_gkt_keytab" "$1" true; then
+      # If unable to kinit, reset the keys and store them in the keytab.
       KRB5CCNAME="$boxconf_ccache" ktutil -v -k "$_gkt_keytab" get -p "${boxconf_user}@${realm}" "${1}@${realm}"
     fi
     shift
