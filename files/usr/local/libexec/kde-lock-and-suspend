@@ -1,0 +1,18 @@
+#!/bin/sh
+
+# Lock all active KDE sessions, and suspend to S3.
+
+/usr/local/bin/qdbus-qt5 --literal --system        \
+    org.freedesktop.ConsoleKit                     \
+    /org/freedesktop/ConsoleKit/Manager            \
+    org.freedesktop.ConsoleKit.Manager.GetSessions \
+  | /usr/bin/sed 's/^.*\(Session[0-9]*\).*$/\1/'   \
+  | /usr/bin/xargs -rtn1 -I%                       \
+      /usr/local/bin/qdbus-qt5 --system            \
+        org.freedesktop.ConsoleKit                 \
+        /org/freedesktop/ConsoleKit/%              \
+        org.freedesktop.ConsoleKit.Session.Lock
+
+sleep 1
+
+/usr/sbin/acpiconf -s3

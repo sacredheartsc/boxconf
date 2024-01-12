@@ -91,6 +91,15 @@ ldap_delete(){
   boxconf_kinit && KRB5CCNAME="$boxconf_ccache" ldapdelete -Q "$@"
 }
 
+ldap_ensure_attribute(){
+  # $1 = dn, $2 = attribute, $3 = value
+  ldap_search -b "$1" -s base "(${2}=${3})" dn | grep '^dn:' \
+    || ldap_modify "$1" <<EOF
+add: ${2}
+${2}: ${3}
+EOF
+}
+
 create_krb5_service(){
   while [ $# -gt 0 ]; do
     ldap_add "cn=${1},${services_basedn}" <<EOF

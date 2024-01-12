@@ -24,5 +24,3 @@ set_loader_conf                           \
   pf_load=YES                             \
   pflog_load=YES                          \
   security.bsd.allow_destructive_dtrace=0 \
-
-load_kernel_module htcp

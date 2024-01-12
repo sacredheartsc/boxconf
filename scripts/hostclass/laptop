@@ -1,0 +1,98 @@
+#!/bin/sh
+
+: ${desktop_access_role:='desktop-access'}
+: ${desktop_access_gid:='40000'}
+
+load_kernel_module linux linux64
+
+pkg install -y             \
+  drm-kmod                 \
+  eclipse                  \
+  firefox                  \
+  gajim                    \
+  gnucash                  \
+  juk                      \
+  k3b                      \
+  kde5                     \
+  kid3-qt5                 \
+  kmix                     \
+  konversation             \
+  libva-intel-media-driver \
+  makemkv                  \
+  networkmgr               \
+  sddm                     \
+  stow                     \
+  tmux                     \
+  tree                     \
+  ungoogled-chromium
+
+set_sysctl                         \
+  net.local.stream.recvspace=65536 \
+  net.local.stream.sendspace=65536 \
+  kern.sched.preempt_thresh=224    \
+  vfs.usermount=1                  \
+  hw.snd.latency=7
+
+set_loader_conf                             \
+  kern.ipc.shmseg=1024                      \
+  kern.ipc.shmmni=1024                      \
+  kern.maxproc=100000                       \
+  linux_load=YES                            \
+  linux64_load=YES                          \
+  acpi_ibm_load=YES                         \
+  compat.linuxkpi.i915_enable_dc=2          \
+  compat.linuxkpi.i915_enable_fbc=1         \
+  compat.linuxkpi.i915_fastboot=1           \
+  compat.linuxkpi.i915_disable_power_well=1 \
+  machdep.hwpstate_pkg_ctrl=0               \
+  vfs.zfs.txg.timeout=10                    \
+  hw.pci.do_power_nodriver=3
+
+# Set USB power savings
+usbconfig | awk -F: '{ print $1 }' | xargs -rtn1 -I%  usbconfig -d % power_save ||:
+install_file /etc/rc.local
+
+# Create desktop access role.
+ldap_add "cn=${desktop_access_role},${roles_basedn}" <<EOF
+objectClass: groupOfMembers
+objectClass: posixGroup
+cn: ${desktop_access_role}
+gidNumber: ${desktop_access_gid}
+EOF
+
+# Create polkit rules for shutdown/reboot/suspend
+install_template -m 0644 /usr/local/etc/polkit-1/rules.d/51-desktop-access.rules
+
+# Create desktop devfs ruleset.
+install_template -m 0644 /etc/devfs.rules
+
+# Create devd rule for lid lock.
+install_file -m 0555 /usr/local/libexec/kde-lock-and-suspend
+install_file -m 0644 /etc/devd/lidlock.conf
+
+# Create desktop-access sudo role.
+ldap_add "cn=desktop-access,${sudo_basedn}" <<EOF
+objectClass: sudoRole
+cn: desktop-access
+sudoUser: %${desktop_access_role}
+sudoCommand: /usr/local/bin/networkmgr
+sudoRunAsUser: ALL
+sudoRunAsGroup: ALL
+sudoOption: !authenticate
+EOF
+
+# Add current host to desktop-access sudo role.
+ldap_ensure_attribute "cn=desktop-access,${sudo_basedn}" sudoHost "$fqdn"
+
+sysrc -v                       \
+  dbus_enable=YES              \
+  sddm_enable=YES              \
+  kld_list+='i915kms'          \
+  devfs_system_ruleset=desktop
+
+load_kernel_module i915kms
+
+service devfs restart
+service devd restart
+service dbus status || service dbus start
+service sddm status || service sddm start

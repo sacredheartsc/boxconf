@@ -10,6 +10,7 @@
 : ${poudriere_dataset:="${state_dataset:-zroot}"}
 : ${poudriere_make_jobs_number:='4'}
 : ${poudriere_allow_make_jobs_packages:='ImageMagick* cargo-c *chromium* cmake cmake-core eclipse electron* ffmpeg firefox gcc* gnutls gtk3* icu libreoffice* llvm* mongodb* mysql*-client mysql*-server node* openjdk* openssl pkg qt*-webengine rust webkit* vaultwarden'}
+: ${poudriere_ccache_size:='25.0G'}
 
 poudriere_data_dir=/usr/local/poudriere
 poudriere_conf_dir=/usr/local/etc/poudriere.d
@@ -22,7 +23,8 @@ create_dataset -o "mountpoint=${poudriere_conf_dir}" "${state_dataset}/poudriere
 pkg install -y \
   poudriere    \
   git-lite     \
-  nginx
+  nginx        \
+  ccache
 
 # Generate poudriere configuration.
 install_template -m 0644           \
@@ -31,6 +33,8 @@ install_template -m 0644           \
 install_file -m 0400 /usr/local/etc/ssl/repo.key
 install_file -m 0644 "${poudriere_conf_dir}/pkglist"
 install_directory -m 0755 /usr/ports/distfiles
+install_directory -m 0755 -o nobody -g nobody "${poudriere_data_dir}/ccache"
+install_template -m 0644 -o nobody -g nobody "${poudriere_data_dir}/ccache/ccache.conf"
 
 # Configure and enable nginx to serve the packages.
 install_template -m 0644           \
@@ -67,7 +71,7 @@ install_directory -m 0555 "${poudriere_data_dir}/data/packages/poudriere"
 
 # Create cron job to update packages automatically.
 install_file -m 0555 /usr/local/libexec/poudriere-cron
-echo "@daily root lockf -t 0 /tmp/poudriere-cron.lock /usr/local/libexec/poudriere-cron $(echo "$poudriere_versions" | tr . _)" \
+echo "@weekly root lockf -t 0 /tmp/poudriere-cron.lock /usr/local/libexec/poudriere-cron $(echo "$poudriere_versions" | tr . _)" \
   | tee /etc/cron.d/poudriere
 
 # Now that we have a valid repo, switch the pkg repo to the local filesystem.

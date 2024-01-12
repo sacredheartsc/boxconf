@@ -46,7 +46,7 @@ load_kernel_module(){
   case $BOXCONF_OS_FAMILY in
     freebsd)
       while [ $# -gt 0 ]; do
-        kldstat -qm "$1" || kldload -v "$1"
+        kldstat -qn "$1" || kldload -v "$1"
         shift
       done
       ;;

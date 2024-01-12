@@ -3,9 +3,11 @@ archivers/unzip
 archivers/zip
 audio/juk
 audio/kid3
+audio/kmix
 databases/postgresql15-client
 databases/postgresql15-server
 databases/redis
+devel/ccache
 devel/cgit
 devel/git@lite
 devel/py-pip
@@ -43,6 +45,7 @@ net-mgmt/icinga2
 net-mgmt/icingadb
 net-mgmt/icingaweb2
 net-mgmt/icingaweb2-module-icingadb
+net-mgmt/networkmgr
 net-mgmt/unifi8
 net/asterisk18
 net/freeradius3
@@ -57,6 +60,7 @@ security/cyrus-sasl2-saslauthd
 security/heimdal-devel
 security/kstart
 security/pam_krb5@heimdal_base
+security/pam_mkhomedir
 security/sshpass
 security/sudo
 security/vaultwarden
@@ -77,3 +81,4 @@ www/ungoogled-chromium
 www/w3m
 x11/kde5
 x11/sddm
+x11/xev

@@ -1,0 +1,3 @@
+[desktop=1000]
+add path 'drm/*'       mode 0660 group ${desktop_access_gid}
+add path 'backlight/*' mode 0660 group ${desktop_access_gid}

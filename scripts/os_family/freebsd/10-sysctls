@@ -12,6 +12,8 @@ case $BOXCONF_OS_VERSION in
     ;;
 esac
 
+load_kernel_module cc_htcp
+
 set_sysctl                                    \
   net.inet.icmp.drop_redirect=1               \
   net.inet.ip.process_options=0               \
