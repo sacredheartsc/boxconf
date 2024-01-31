@@ -4,10 +4,7 @@ set_loader_conf      \
   if_iwm_load=YES    \
   iwm8265fw_load=YES
 
-sysrc -v                                       \
-  wlans_iwm0='wlan0'                           \
-  create_args_wlan0='country US regdomain FCC' \
-  ifconfig_wlan0='WPA DHCP powersave'
+sysrc -v wlans_iwm0='wlan0'
 
 set_sysctl dev.acpi_ibm.0.handlerevents='0x10 0x11'
 

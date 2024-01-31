@@ -3,9 +3,13 @@
 : ${desktop_access_role:='desktop-access'}
 : ${desktop_access_gid:='40000'}
 
+wifi_tls_cert=/usr/local/etc/ssl/wifi.crt
+wifi_tls_key=/usr/local/etc/ssl/wifi.key
+
 load_kernel_module linux linux64
 
 pkg install -y             \
+  chromium                 \
   drm-kmod                 \
   eclipse                  \
   firefox                  \
@@ -19,12 +23,10 @@ pkg install -y             \
   konversation             \
   libva-intel-media-driver \
   makemkv                  \
-  networkmgr               \
   sddm                     \
   stow                     \
   tmux                     \
   tree                     \
-  ungoogled-chromium
 
 set_sysctl                         \
   net.local.stream.recvspace=65536 \
@@ -51,6 +53,13 @@ set_loader_conf                             \
 # Set USB power savings
 usbconfig | awk -F: '{ print $1 }' | xargs -rtn1 -I%  usbconfig -d % power_save ||:
 install_file /etc/rc.local
+
+# Install host certificate.
+install_certificate     -m 0644 "dc=${BOXCONF_HOSTNAME},${hosts_basedn}" "$wifi_tls_cert"
+install_certificate_key -m 0600 "dc=${BOXCONF_HOSTNAME},${hosts_basedn}" "$wifi_tls_key"
+
+# Configure wpa_supplicant.
+install_template -m 0644 /etc/wpa_supplicant.conf
 
 # Create desktop access role.
 ldap_add "cn=${desktop_access_role},${roles_basedn}" <<EOF
@@ -84,11 +93,38 @@ EOF
 # Add current host to desktop-access sudo role.
 ldap_ensure_attribute "cn=desktop-access,${sudo_basedn}" sudoHost "$fqdn"
 
-sysrc -v                       \
-  dbus_enable=YES              \
-  sddm_enable=YES              \
-  kld_list+='i915kms'          \
-  devfs_system_ruleset=desktop
+# Enable kwallet pam module.
+install_file -m 0644 /etc/pam.d/sddm
+
+# Copy SDDM config file.
+install_template /usr/local/etc/sddm.conf
+
+# Create policy file for firefox.
+install_directory -m 0755 /usr/local/lib/firefox/distribution
+install_template -m 0644  /usr/local/lib/firefox/distribution/policies.json
+
+# Create policy file for chromium.
+install_directory -m 0755                  \
+  /usr/local/etc/chromium/policies         \
+  /usr/local/etc/chromium/policies/managed
+install_template -m 0644 /usr/local/etc/chromium/policies/managed/policies.json
+
+# Create xdg override directory.
+install_directory -m 0755          \
+  /usr/local/override              \
+  /usr/local/override/applications
+
+# Create xdg application overrides.
+install_file -m 0644 \
+  /usr/local/override/applications/signal-desktop.desktop
+
+sysrc -v                                       \
+  dbus_enable=YES                              \
+  sddm_enable=YES                              \
+  kld_list+='i915kms'                          \
+  devfs_system_ruleset=desktop                 \
+  create_args_wlan0='country US regdomain FCC' \
+  ifconfig_wlan0="WPA inet ${ipv4_address} netmask ${ipv4_netmask} powersave"
 
 load_kernel_module i915kms
 

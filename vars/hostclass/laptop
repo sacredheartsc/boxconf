@@ -1,3 +1,4 @@
 #!/bin/sh
 
-intel_epp=90
+intel_epp=75
+allow_proc_debug=1

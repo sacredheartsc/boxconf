@@ -2,6 +2,7 @@
 
 enable_pf=true
 allow_wx=1
+allow_proc_debug=0
 cx_lowest=Cmax
 intel_epp=50
 ca_cert=/usr/local/etc/ssl/certs/ca.crt

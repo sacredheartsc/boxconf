@@ -1,0 +1,59 @@
+#!/bin/sh
+
+: ${radius_clients=''}
+
+freeradius_user=freeradius
+freeradius_conf_dir=/usr/local/etc/raddb
+freeradius_dhparams="${freeradius_conf_dir}/dhparams.pem"
+freeradius_tls_cert="${freeradius_conf_dir}/freeradius.crt"
+freeradius_tls_key="${freeradius_conf_dir}/freeradius.key"
+freeradius_cache_dir=/var/cache/radiusd
+freeradius_tlscache_dir="${freeradius_cache_dir}/tlscache"
+freeradius_dhparams="${freeradius_conf_dir}/certs/dh"
+
+pkg install -y freeradius3
+
+freeradius_version=$(pkg info freeradius3 | awk '$1 == "Version" { print $3 }')
+
+# Generate dhparams.
+[ -f "$freeradius_dhparams" ] || openssl dhparam -out "$freeradius_dhparams" 2048
+
+# Generate configuration.
+install_directory -m 0755 "${freeradius_conf_dir}/certs"
+install_template -o "$freeradius_user" -g "$freeradius_user" -m 0640 \
+  "${freeradius_conf_dir}/radiusd.conf"                              \
+  "${freeradius_conf_dir}/mods-available/eap"
+rm -f "${freeradius_conf_dir}/sites-enabled/inner-tunnel"
+
+# Generate dhparams.
+[ -f "$freeradius_dhparams" ] || openssl dhparam -out "$freeradius_dhparams" 2048
+
+# Copy TLS certificate for freeradius.
+install_certificate     -m 0644 -o root -g "$freeradius_user" "$fqdn" "$freeradius_tls_cert"
+install_certificate_key -m 0640 -o root -g "$freeradius_user" "$fqdn" "$freeradius_tls_key"
+
+# Generate clients.conf.
+install -Cv -o "$freeradius_user" -g "$freeradius_user" -m 0660 /dev/null "${freeradius_conf_dir}/clients.conf"
+for client_name in $radius_clients; do
+  eval "client_address=\$radius_${client_name}_address"
+  eval "client_secret=\$radius_${client_name}_secret"
+  cat <<EOF >> "${freeradius_conf_dir}/clients.conf"
+client ${client_name} {
+  ipaddr = ${client_address}
+  secret = ${client_secret}
+}
+
+EOF
+done
+
+# Create cache directories.
+install_directory -o "$freeradius_user" -g "$freeradius_user" -m 700 \
+  "$freeradius_cache_dir"                                            \
+  "$freeradius_tlscache_dir"
+
+# Clean up tlscache with cron job.
+echo "@daily ${freeradius_user} find ${freeradius_tlscache_dir} -mindepth 1 -mtime +2 -exec rm -vf {} +" \
+  | tee /etc/cron.d/freeradius-cleanup-tlscache
+
+sysrc -v radiusd_enable=YES
+service radiusd restart

@@ -62,6 +62,9 @@ lmtp_port=25
 quota_status_port=10993
 rspamd_port=11334
 
+human_uid_min=10000
+human_uid_max=19999
+
 # The poudriere server must be built before the IDM servers, which results
 # in a chicken-and-egg problem with DNS. When the $no_idm extra var is set,
 # just use Google DNS.

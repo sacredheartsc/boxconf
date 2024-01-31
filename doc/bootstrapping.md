@@ -68,6 +68,7 @@ the following options:
     allow.mount.nullfs    = true;
     allow.raw_sockets     = true;
     allow.socket_af       = true;
+    allow.mlock           = true;
     sysvmsg               = new;
     sysvsem               = new;
     sysvshm               = new;

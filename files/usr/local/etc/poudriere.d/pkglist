@@ -57,7 +57,7 @@ net/syncthing
 ports-mgmt/poudriere
 security/acme.sh
 security/cyrus-sasl2-saslauthd
-security/heimdal-devel
+security/heimdal
 security/kstart
 security/pam_krb5@heimdal_base
 security/pam_mkhomedir
@@ -77,8 +77,9 @@ www/firefox
 www/nginx
 www/sabredav
 www/tt-rss
-www/ungoogled-chromium
+www/chromium
 www/w3m
+www/linux-widevine-cdm
 x11/kde5
 x11/sddm
 x11/xev

@@ -1,6 +1,12 @@
 #!/bin/sh
 
-pkg install -y heimdal-devel
+pkg install -y heimdal
+
+# The release of heimdal in FreeBSD ports is incompatible with OpenSSL 3
+# due to some deprecated ciphers:
+#   https://github.com/heimdal/heimdal/issues/1005
+# This config file allows the KDC to work.
+install_file -m 0644 /etc/ssl/openssl.cnf
 
 # Generate the system kerberos configuration.
 install_template -m 0644 /etc/krb5.conf

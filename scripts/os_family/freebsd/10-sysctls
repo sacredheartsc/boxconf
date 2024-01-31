@@ -42,7 +42,7 @@ set_sysctl                                    \
   net.inet.tcp.sendspace=65536                \
   net.inet.tcp.syncookies=0                   \
   net.inet6.ip6.redirect=0                    \
-  security.bsd.unprivileged_proc_debug=0
+  security.bsd.unprivileged_proc_debug="$allow_proc_debug"
 
 # Some sysctls cannot be set within jails.
 if [ "$BOXCONF_VIRTUALIZATION_TYPE" != jail ]; then

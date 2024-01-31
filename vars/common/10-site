@@ -3,6 +3,7 @@
 organization='SacredHeartSC Test Environment'
 domain=test.sacredheartsc.com
 email_domain=sacredheartsc.com
+ssid=sacredheartsc-test
 locale=en_US.UTF-8
 timezone=America/New_York
 root_authorized_keys='ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICy6mAAeVe2eo5j/d+vLOATvLCOTvp2BMjI9aeW7KcwI'
@@ -25,3 +26,6 @@ vlan130_ntp_servers='10.11.130.1'
 vlan199_cidr='10.11.199.0/24'
 vlan199_gateway='10.11.199.1'
 vlan199_ntp_servers='10.11.199.1'
+
+radius_clients=unifi
+radius_unifi_address=10.11.130.0/24
