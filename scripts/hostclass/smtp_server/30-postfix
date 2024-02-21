@@ -14,6 +14,12 @@ get_keytab           \
   "$postfix_keytab"  \
   "smtp/${fqdn}"
 
+# Hack: we have to create a ~/.krb5/config file for the postfix user in order to
+# specify the correct keytab. Turns out Heimdal refuses to obey KRB5_KTNAME when
+# an application drops privileges.
+install_directory -m 0755 "${postfix_home_dir}/.krb5"
+install_template -m 0644 "${postfix_home_dir}/.krb5/config"
+
 # Generate dhparams.
 [ -f "$postfix_dhparams" ] || openssl dhparam -out "$postfix_dhparams" 2048
 
@@ -35,11 +41,15 @@ install_directory -m 0750 -o "$saslauthd_user" -g "$postfix_user" "$saslauthd_ru
 # Acquire public TLS certificate.
 install_file /usr/local/etc/sudoers.d/acme
 get_acme_certificate               \
-  -c "$postfix_tls_cert"           \
-  -k "$postfix_tls_key"            \
+  -c "$postfix_public_tls_cert"    \
+  -k "$postfix_public_tls_key"     \
   -g "$postfix_user"               \
   -r 'sudo service postfix reload' \
-  "$postfix_myhostname"
+  "$postfix_public_fqdn"
+
+# Copy internal TLS certificate.
+install_certificate     -m 0644 -o root -g "$postfix_user" "$fqdn" "$postfix_local_tls_cert"
+install_certificate_key -m 0640 -o root -g "$postfix_user" "$fqdn" "$postfix_local_tls_key"
 
 # Enable and start postfix and dependencies.
 sysrc -v                                  \

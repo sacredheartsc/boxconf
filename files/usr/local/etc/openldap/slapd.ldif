@@ -205,7 +205,7 @@ olcUniqueURI: ldap:///${groups_basedn}?gidNumber?sub
 olcUniqueURI: ldap:///${hosts_basedn}?cn,dc?sub
 olcUniqueURI: ldap:///${services_basedn}?cn?sub
 olcUniqueURI: ldap:///${sudo_basedn}?cn?sub
-olcUniqueURI: ldap:///${basedn}?associatedDomain?sub
+olcUniqueURI: ldap:///${dns_basedn}?associatedDomain?sub
 
 # Refint overlay.
 dn: olcOverlay={4}refint,olcDatabase={1}mdb,cn=config

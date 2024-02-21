@@ -15,7 +15,6 @@
 
 : ${postfix_cipherlist:='ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-CHACHA20-POLY1305'}
 : ${postfix_myorigin:="$email_domain"}
-: ${postfix_myhostname:="$fqdn"}
 : ${postfix_mynetworks:=''}
 : ${postfix_recipient_delimiter:='+'}
 : ${postfix_message_size_limit:='67108864'} # 64 MB
@@ -43,8 +42,11 @@ rspamd_bayes_redis_data_dir="${redis_data_dir}/rspamd-bayes"
 
 postfix_user=postfix
 postfix_conf_dir=/usr/local/etc/postfix
+postfix_home_dir=/var/spool/postfix
 postfix_user=postfix
 postfix_keytab="${keytab_dir}/postfix.keytab"
-postfix_tls_cert="${acme_cert_dir}/postfix.crt"
-postfix_tls_key="${acme_cert_dir}/postfix.key"
+postfix_public_tls_cert="${acme_cert_dir}/postfix.crt"
+postfix_public_tls_key="${acme_cert_dir}/postfix.key"
+postfix_local_tls_cert="${postfix_conf_dir}/postfix.crt"
+postfix_local_tls_key="${postfix_conf_dir}/postfix.key"
 postfix_dhparams="${postfix_conf_dir}/dhparams.pem"

@@ -2,10 +2,12 @@
 
 set -eu -o pipefail
 
-/usr/local/bin/ldapsearch \
-  -QLLL \
-  -o ldif_wrap=no \
-  -b '${hosts_basedn}' \
-  "(&(sshPublicKey=*)(associatedDomain=\$1))" \
-  sshPublicKey \
-  | /usr/bin/sed -ne 's/^sshPublicKey: //p'
+/usr/local/bin/ldapsearch                     \\
+  -QLLL                                       \\
+  -o ldif_wrap=no                             \\
+  -b '${hosts_basedn}'                        \\
+  "(&(sshPublicKey=*)(associatedDomain=\$1))" \\
+  sshPublicKey                                \\
+  | /usr/bin/sed -n                           \\
+      -e 's/^sshPublicKey: //p'               \\
+      -e "s/^/\${1} /p"

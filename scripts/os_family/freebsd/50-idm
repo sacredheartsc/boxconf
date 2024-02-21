@@ -34,22 +34,13 @@ install_template -m 0644             \
 ln -snfv /usr/local/etc/openldap/ldap.conf /usr/local/etc/ldap.conf
 
 # Create host object (if it doesn't exist).
-# NB: Stuffing the PTR and A record into the same object allows some bogus
-#     DNS queries to succeed. For example, you can query the in-addr.arpa
-#     record as an A record (rather than PTR) and you'll get the FQDN back.
-#
-#     I'm leaving this as is, because this seems ~fine for internal stuff, and
-#     it's very convenient to have all the related DNS bits in the host entry.
-ldap_add "dc=${BOXCONF_HOSTNAME},${hosts_basedn}" <<EOF
-objectClass: dNSDomain2
+ldap_add "cn=${BOXCONF_HOSTNAME},${hosts_basedn}" <<EOF
+objectClass: device
 objectClass: domainRelatedObject
 objectClass: ldapPublicKey
 objectClass: krb5KDCEntry
 cn: ${BOXCONF_HOSTNAME}
-$(printf "associatedDomain: %s.${domain}\n" "$BOXCONF_HOSTNAME" ${cnames:-})
-associatedDomain: $(ip2rdns "$BOXCONF_DEFAULT_IPV4")
-aRecord: ${BOXCONF_DEFAULT_IPV4}
-pTRRecord: ${fqdn}
+associatedDomain: ${fqdn}
 krb5PrincipalName: host/${fqdn}@${realm}
 krb5KeyVersionNumber: 0
 krb5KDCFlags: ${krb5_default_princ_flags}
@@ -59,17 +50,43 @@ $(cat /etc/ssh/ssh_host_*_key.pub | cut -d' ' -f-2 | sed 's/^/sshPublicKey: /')
 description: $(uname -mrs) ${BOXCONF_HOSTCLASS}
 EOF
 
+# Create A record.
+ldap_add "dc=${BOXCONF_HOSTNAME},dc=${domain},${dns_basedn}" <<EOF
+objectClass: dNSDomain
+objectClass: domainRelatedObject
+dc: ${BOXCONF_HOSTNAME}
+aRecord: ${BOXCONF_DEFAULT_IPV4}
+associatedDomain: ${fqdn}
+EOF
+
+# Create PTR record.
+rdns=$(ip2rdns "$BOXCONF_DEFAULT_IPV4")
+ldap_add "dc=${rdns%%.*},dc=${rdns#*.},${dns_basedn}" <<EOF
+objectClass: dNSDomain2
+objectClass: domainRelatedObject
+dc: ${rdns%%.*}
+pTRRecord: ${fqdn}
+associatedDomain: ${rdns}
+EOF
+
+# Create CNAME records.
+for cname in ${cnames:-}; do
+  ldap_add "dc=${cname},dc=${domain},${dns_basedn}" <<EOF
+objectClass: dNSDomain
+objectClass: domainRelatedObject
+dc: ${cname}
+cNAMERecord: ${fqdn}
+associatedDomain: ${cname}.${domain}
+EOF
+done
+
 # Update attributes that may have changed.
-ldap_modify "dc=${BOXCONF_HOSTNAME},${hosts_basedn}" <<EOF
+ldap_modify "cn=${BOXCONF_HOSTNAME},${hosts_basedn}" <<EOF
 replace: sshPublicKey
 $(cat /etc/ssh/ssh_host_*_key.pub | cut -d' ' -f-2 | sed 's/^/sshPublicKey: /')
 -
 replace: description
 description: $(uname -mrs) ${BOXCONF_HOSTCLASS}
--
-replace: associatedDomain
-$(printf "associatedDomain: %s.${domain}\n" "$BOXCONF_HOSTNAME" ${cnames:-})
-associatedDomain: $(ip2rdns "$BOXCONF_DEFAULT_IPV4")
 EOF
 
 # Create host keytab.

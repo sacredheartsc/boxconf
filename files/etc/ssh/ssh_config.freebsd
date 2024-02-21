@@ -1,6 +1,6 @@
 CanonicalizeHostname always
 CanonicalDomains ${domain}
-CanonicalizeMaxDots 0
+CanonicalizePermittedCNAMEs *.${domain}:*.${domain}
 KnownHostsCommand /usr/local/libexec/idm-ssh-known-hosts %H
 
 Host *.${domain}

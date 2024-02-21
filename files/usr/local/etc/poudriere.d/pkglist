@@ -15,6 +15,7 @@ dns/bind-tools
 dns/nsd
 dns/powerdns
 dns/unbound
+editors/libreoffice
 editors/vim@console
 editors/vim@tiny
 finance/gnucash

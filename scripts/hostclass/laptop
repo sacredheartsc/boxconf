@@ -21,6 +21,7 @@ pkg install -y             \
   kid3-qt5                 \
   kmix                     \
   konversation             \
+  libreoffice              \
   libva-intel-media-driver \
   makemkv                  \
   sddm                     \
@@ -117,6 +118,12 @@ install_directory -m 0755          \
 # Create xdg application overrides.
 install_file -m 0644 \
   /usr/local/override/applications/signal-desktop.desktop
+
+# Configure libreoffice
+install_file -m 0644 /usr/local/lib/libreoffice/program/sofficerc
+
+# Create profile script for KDE environment variables.
+install_file -m 0644 /etc/profile.d/kde.sh
 
 sysrc -v                                       \
   dbus_enable=YES                              \

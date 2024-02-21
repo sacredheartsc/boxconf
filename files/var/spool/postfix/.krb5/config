@@ -1,0 +1,2 @@
+[libdefaults]
+  default_keytab_name = FILE:${postfix_keytab}

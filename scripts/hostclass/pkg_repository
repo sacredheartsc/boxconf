@@ -15,7 +15,8 @@
 poudriere_data_dir=/usr/local/poudriere
 poudriere_conf_dir=/usr/local/etc/poudriere.d
 
-# Create poudriere config dataset.
+# Create poudriere datasets.
+create_dataset -o "mountpoint=${poudriere_data_dir}" "${state_dataset}/poudriere"
 create_dataset -o "mountpoint=${poudriere_conf_dir}" "${state_dataset}/poudriere-config"
 
 # These packages are needed to bootstrap poudriere. On the first run, they'll

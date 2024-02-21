@@ -19,7 +19,7 @@ setgid_group      = maildrop
 import_environment = MAIL_CONFIG MAIL_DEBUG MAIL_LOGTAG TZ XAUTHORITY DISPLAY LANG=C POSTLOG_SERVICE POSTLOG_HOSTNAME KRB5_KTNAME=${postfix_keytab}
 
 myorigin      = ${postfix_myorigin}
-myhostname    = ${postfix_myhostname}
+myhostname    = ${postfix_public_fqdn}
 mynetworks    = 127.0.0.0/8 [::1]/128 [fe80::]/64 ${postfix_mynetworks}
 mydestination =
 
@@ -39,10 +39,16 @@ show_user_unknown_table_name = no
 tls_medium_cipherlist        = ${postfix_cipherlist}
 tls_preempt_cipherlist       = no
 
+smtpd_tls_chain_files =
+  ${postfix_public_tls_key},
+  ${postfix_public_tls_cert}
+tls_server_sni_maps =
+  inline:{
+    { ${postfix_public_fqdn} = ${postfix_public_tls_key},${postfix_public_tls_cert} },
+    { .${domain} = ${postfix_local_tls_key},${postfix_local_tls_cert} }
+  }
 smtpd_tls_security_level        = may
 smtpd_tls_auth_only             = yes
-smtpd_tls_cert_file             = ${postfix_tls_cert}
-smtpd_tls_key_file              = ${postfix_tls_key}
 smtpd_tls_mandatory_protocols   = >=TLSv1.2
 smtpd_tls_mandatory_ciphers     = medium
 smtpd_tls_dh1024_param_file     = ${postfix_dhparams}
