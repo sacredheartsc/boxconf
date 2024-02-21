@@ -8,6 +8,5 @@ set -eu -o pipefail
   -b '${hosts_basedn}'                        \\
   "(&(sshPublicKey=*)(associatedDomain=\$1))" \\
   sshPublicKey                                \\
-  | /usr/bin/sed -n                           \\
-      -e 's/^sshPublicKey: //p'               \\
-      -e "s/^/\${1} /p"
+  | /usr/bin/sed -nE                          \\
+      -e "s/^sshPublicKey: (.*)$/\${1} \1/p"

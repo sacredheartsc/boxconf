@@ -2,10 +2,10 @@
 
 set -eu -o pipefail
 
-KRB5CCNAME=/tmp/krb5cc_0 /usr/local/bin/ldapsearch \
-  -QLLL \
-  -o ldif_wrap=no \
-  -b '${accounts_basedn}' \
-  "(&(sshPublicKey=*)(uid=\$1))" \
-  sshPublicKey \
+KRB5CCNAME=/tmp/krb5cc_0 /usr/local/bin/ldapsearch \\
+  -QLLL                                            \\
+  -o ldif_wrap=no                                  \\
+  -b '${accounts_basedn}'                          \\
+  "(&(sshPublicKey=*)(uid=\$1))"                   \\
+  sshPublicKey                                     \\
   | /usr/bin/sed -ne 's/^sshPublicKey: //p'
