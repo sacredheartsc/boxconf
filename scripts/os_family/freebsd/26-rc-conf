@@ -4,8 +4,4 @@ sysrc -v                          \
   clear_tmp_enable=YES            \
   dumpdev=NO                      \
   ipv6_activate_all_interfaces=NO \
-  sendmail_enable=NO              \
-  sendmail_msp_queue_enable=NO    \
-  sendmail_outbound_enable=NO     \
-  sendmail_submit_enable=NO       \
   syslogd_flags=-ss

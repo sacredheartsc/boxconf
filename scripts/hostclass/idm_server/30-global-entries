@@ -215,7 +215,9 @@ EOF
 ldap_add "cn=${idm_admin_group},${groups_basedn}" <<EOF
 objectClass: groupOfMembers
 objectClass: posixGroup
+objectClass: mailRecipient
 gidNumber: ${idm_admin_gid}
+mailAddress: ${idm_admin_group}@${email_domain}
 EOF
 
 # Sudo role: allow members of the admin group to run any command.

@@ -19,6 +19,7 @@ editors/libreoffice
 editors/vim@console
 editors/vim@tiny
 finance/gnucash
+finance/kmymoney
 graphics/ImageMagick7@nox11
 graphics/drm-kmod
 graphics/p5-Image-ExifTool
@@ -74,9 +75,9 @@ sysutils/stow
 sysutils/tmux
 sysutils/tree
 textproc/jq
+www/davical
 www/firefox
 www/nginx
-www/sabredav
 www/tt-rss
 www/chromium
 www/w3m

@@ -67,3 +67,7 @@ service postfix restart
 # Use postfix as the system MTA.
 install_directory -m 0755 /usr/local/etc/mail
 install_file -m 0644 /usr/local/etc/mail/mailer.conf
+
+# Configure local aliases.
+install_template -m 0644 /etc/aliases
+newaliases

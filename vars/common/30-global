@@ -54,13 +54,18 @@ nginx_ssl_ciphers='ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECD
 acme_standalone_port=9080
 acme_email="root@${email_domain}"
 
+idm_admin_group=sysadmins
 mail_access_role=mail-access
 
-rspamd_host='smtp'
-imap_host='imap'
+pkg_host=pkg
+smtp_host=smtp
+rspamd_host=smtp
+imap_host=imap
 lmtp_port=25
 quota_status_port=10993
 rspamd_port=11334
+
+root_email=${idm_admin_group}@${email_domain}
 
 human_uid_min=10000
 human_uid_max=19999

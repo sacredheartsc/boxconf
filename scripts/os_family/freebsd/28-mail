@@ -1,0 +1,6 @@
+#!/bin/sh
+
+[ "$BOXCONF_HOSTCLASS" = smtp_server ] && return 0
+
+install_template -m 0644 /etc/dma/dma.conf
+install_template -m 0644 /etc/aliases

@@ -2,6 +2,6 @@
 127.0.0.1  localhost  localhost.${domain}
 
 # NB: We explicitly set postfix_public_fqdn here, to ensure that it always resolves.
-# If the Postfix $myhostname variable doesn't resolve to a local IP address, then
+# If the Postfix \$myhostname variable doesn't resolve to a local IP address, then
 # GSSAPI authentication via Cyrus SASL fails. I don't understand why.
 ${BOXCONF_DEFAULT_IPV4}  ${BOXCONF_HOSTNAME}.${domain}  ${BOXCONF_HOSTNAME}  ${postfix_public_fqdn}
