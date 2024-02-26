@@ -58,6 +58,7 @@ net/rsync
 net/syncthing
 ports-mgmt/poudriere
 security/acme.sh
+security/bitwarden-cli
 security/cyrus-sasl2-saslauthd
 security/heimdal
 security/kstart

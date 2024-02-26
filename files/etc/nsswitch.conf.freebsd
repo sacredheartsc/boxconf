@@ -1,8 +1,8 @@
-group: cache files ldap
-hosts: cache files dns
+group: files cache ldap
+hosts: files cache dns
 netgroup: files
 networks: files
-passwd: cache files ldap
+passwd: files cache ldap
 shells: files
 services: files
 protocols: files
