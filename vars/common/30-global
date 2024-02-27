@@ -61,6 +61,7 @@ pkg_host=pkg
 smtp_host=smtp
 rspamd_host=smtp
 imap_host=imap
+postgres_host=postgres
 lmtp_port=25
 quota_status_port=10993
 rspamd_port=11334

@@ -322,6 +322,7 @@ ${name} {
   mount.devfs;
   devfs_ruleset = "${devfs_ruleset}";
 
+  mount           = "tmpfs \$path/tmp tmpfs rw,size=1G 0 0";
   allow.mount     = true;
   allow.mount.zfs = true;
   enforce_statfs  = 1;
@@ -336,7 +337,7 @@ EOF
   [ -n "${cpuset:-}" ] && \
     echo "  exec.created += \"cpuset -j \$name -cl ${cpuset}\";" >> "$jailcfg"
   [ -n "${memlimit:-}" ] && \
-    echo "  exec.prestart += \"rctl -a jail:\$name:vmemoryuse:deny=${memlimit}\";" >> "$jailcfg"
+    echo "  exec.prestart += \"rctl -a jail:\$name:memoryuse:deny=${memlimit}\";" >> "$jailcfg"
 
   # End jail config file.
   echo '}' >> "$jailcfg"
@@ -931,7 +932,7 @@ cmd::status(){
     | column -t
   printf -- '\n--------------------------- RESOURCE USAGE ---------------------------\n'
   rctl -h -u "jail:${jail}:" \
-    | grep -E '^(maxproc|memoryuse|openfiles|pcpu|vmemoryuse|swapuse|readbps|writebps|readiops|writeiops)=' \
+    | grep -E '^(maxproc|memoryuse|openfiles|pcpu|memoryuse|swapuse|readbps|writebps|readiops|writeiops)=' \
     | rs -c= -C' ' -T \
     | column -t
   printf -- '\n----------------------------- PROCESSES ------------------------------\n'

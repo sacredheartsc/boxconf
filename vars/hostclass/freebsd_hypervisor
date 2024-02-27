@@ -2,3 +2,4 @@
 
 enable_pf=false
 resolvers='10.11.130.1'
+smtp_host=$smtp_host_ipv4

@@ -7,7 +7,10 @@ ssid=sacredheartsc-test
 locale=en_US.UTF-8
 timezone=America/New_York
 root_authorized_keys='ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICy6mAAeVe2eo5j/d+vLOATvLCOTvp2BMjI9aeW7KcwI'
+
+# Hard-code some IPs here so that hosts can be accessed without DNS.
 pkg_host_ipv4='10.11.199.4'
+smtp_host_ipv4='10.11.199.5'
 
 idm_servers='idm1 idm2'
 slapd_server_ids="\

@@ -116,3 +116,14 @@ EOF
     shift
   done
 }
+
+boxconf_psql(){
+  boxconf_kinit && KRB5CCNAME="$boxconf_ccache" psql \
+    --quiet                             \
+    --no-align                          \
+    --echo-all                          \
+    --tuples-only                       \
+    --no-password                       \
+    --host="${postgres_host}.${domain}" \
+    "$@"
+}

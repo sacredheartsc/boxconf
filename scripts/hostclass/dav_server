@@ -1,0 +1,99 @@
+#!/bin/sh
+
+: ${davical_user:='s-davical'}
+: ${davical_uid:='20001'}
+
+davical_www_dir=/usr/local/www/davical
+davical_script_dir=/usr/local/share/davical
+davical_tls_cert=/usr/local/etc/nginx/davical.crt
+davical_tls_key=/usr/local/etc/nginx/davical.key
+davical_keytab="${keytab_dir}/davical.keytab"
+davical_client_keytab="${keytab_dir}/davical-client.keytab"
+
+# Install required packages.
+pkg install -y                \
+  "davical-php${php_version}" \
+  kstart                      \
+  "php${php_version}-ldap"    \
+  nginx
+
+# Create davical user account.
+ldap_add "uid=${davical_user},${robots_basedn}" <<EOF
+objectClass: account
+objectClass: posixAccount
+objectClass: krb5KDCEntry
+uid: ${davical_user}
+cn: ${davical_user}
+uidNumber: ${davical_uid}
+gidNumber: ${davical_uid}
+homeDirectory: ${davical_script_dir}
+loginShell: /sbin/nologin
+gecos: Davical Pseudo-User
+userPassword: {SASL}${davical_user}@${realm}
+krb5PrincipalName: ${davical_user}@${realm}
+krb5KeyVersionNumber: 0
+krb5MaxLife: ${krb5_max_ticket_lifetime}
+krb5MaxRenew: ${krb5_max_renew_lifetime}
+krb5KDCFlags: ${krb5_default_princ_flags}
+EOF
+
+# Create davical private group.
+ldap_add "cn=${davical_user},${private_groups_basedn}" <<EOF
+objectClass: groupOfMembers
+objectClass: posixGroup
+gidNumber: ${davical_uid}
+member: uid=${davical_user},${robots_basedn}
+EOF
+
+# Get keytab for davical user.
+get_keytab                  \
+  -o root                   \
+  -g "$davical_user"        \
+  -m 0640                   \
+  "$davical_client_keytab"  \
+  "$davical_user"
+
+# Generate davical configuration.
+install_template -m 0644 "${davical_www_dir}/config/config.php"
+
+# Initialize davical database.
+# TODO
+
+# Sync groups from LDAP.
+# TODO
+
+# Create cron job for keeping LDAP groups up-to-date.
+# TODO
+
+# Create HTTP service principal and keytab.
+create_krb5_service "HTTP/${fqdn}"
+get_keytab           \
+  -m 0600            \
+  "$davical_keytab"  \
+  "HTTP/${fqdn}"
+
+# Copy TLS certificate for nginx.
+install_certificate     -m 0644 "$fqdn" "$davical_tls_cert"
+install_certificate_key -m 0600 "$fqdn" "$davical_tls_key"
+
+# Generate nginx configuration.
+install_template -m 0644 /usr/local/etc/nginx.conf
+
+# Generate php-fpm configuration.
+install_template -m 0644           \
+  /usr/local/etc/php.ini           \
+  /usr/local/etc/php-fpm.conf      \
+  /usr/local/etc/php-fpm.d/davical
+rm -f /usr/local/etc/php-fpm.d/www.conf
+
+# Enable and start daemons.
+sysrc -v                                         \
+  nginx_enable=YES                               \
+  php_fpm_enable=YES                             \
+  kstart_instances+=davical                      \
+  kstart_davical_keytab="$davical_client_keytab" \
+  kstart_davical_flags="-aLK 120 -g ${davical_uid} -o ${davical_uid} -k /tmp/krb5cc_${davical_uid} -u ${davical_user}"
+
+service kstart restart
+service nginx restart
+service php-fpm restart

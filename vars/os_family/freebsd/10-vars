@@ -11,6 +11,9 @@ keytab_dir=/var/db/keytabs
 ssh_host_key_dir=/var/db/ssh
 nslcd_user=nslcd
 
+php_version=83
+postgres_version=15
+
 saslauthd_runtime_dir=/var/run/saslauthd
 saslauthd_user=cyrus
 
