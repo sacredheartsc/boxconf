@@ -17,9 +17,11 @@ boxconf_test_ccache='/tmp/krb5cc_boxconf_test'
 BOXCONF_CLEANUP_PATHS="${BOXCONF_CLEANUP_PATHS} ${boxconf_ccache} ${boxconf_test_ccache}"
 
 boxconf_kinit(){
-  klist -c "$boxconf_ccache" -t \
-    || printf '%s' "$boxconf_password" \
-      | kinit -c "$boxconf_ccache" --password-file=STDIN "${boxconf_user}@${realm}" "$@"
+  if ! klist -c "$boxconf_ccache" -t; then
+    printf '%s' "$boxconf_password" \
+      | kinit -c "$boxconf_ccache" --password-file=STDIN "${boxconf_user}@${realm}"
+  fi
+  [ $# -eq 0 ] || KRB5CCNAME=$boxconf_ccache "$@"
 }
 
 get_keytab(){

@@ -8,7 +8,7 @@
 : ${dav_access_role:='role-dav-access'}
 
 davical_repo=https://gitlab.com/sacredheartsc/davical.git/
-davical_branch=dev
+davical_branch=ldap-sasl-bind-support
 
 davical_awl_repo=https://gitlab.com/davical-project/awl.git/
 davical_awl_branch=master
@@ -86,10 +86,10 @@ if ! davical_psql -c 'SELECT 1 FROM awl_db_revision'; then
     -f "${davical_awl_repo_dir}/dba/awl-tables.sql"        \
     -f "${davical_awl_repo_dir}/dba/schema-management.sql" \
     -f "${davical_repo_dir}/dba/davical.sql"
-  boxconf_kinit "${davical_repo_dir}/dba/update-davical-database" --nopatch
+  boxconf_kinit "${davical_repo_dir}/dba/update-davical-database" --debug --nopatch
   davical_psql -f "${davical_repo_dir}/dba/base-data.sql"
-  boxconf_kinit "${davical_repo_dir}/dba/update-davical-database"
-  boxconf_psql -c "delete from usr where username = 'admin';"
+  boxconf_kinit "${davical_repo_dir}/dba/update-davical-database" --debug
+#  davical_psql -c "delete from usr where username = 'admin';"
 fi
 
 # Create HTTP service principal and keytab.

@@ -19,6 +19,7 @@
   'host'            => '${ldap_hosts}',
   'port'            => '389',
   'sasl'            => 'yes',
+  'sasl_mech'       => 'GSSAPI',
   'baseDNUsers'     => '${people_basedn}',
   'baseDNGroups'    => '${groups_basedn}',
   'scope'           => 'onelevel',
