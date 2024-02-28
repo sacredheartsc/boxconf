@@ -4,12 +4,16 @@ archivers/zip
 audio/juk
 audio/kid3
 audio/kmix
+converters/php${php_version}-iconv
+databases/php${php_version}-pdo_pgsql
+databases/php${php_version}-pgsql
 databases/postgresql15-client
 databases/postgresql15-server
 databases/redis
 devel/ccache
 devel/cgit
 devel/git@lite
+devel/php${php_version}-gettext
 devel/py-pip
 dns/bind-tools
 dns/nsd
@@ -20,6 +24,7 @@ editors/vim@console
 editors/vim@tiny
 finance/gnucash
 finance/kmymoney
+ftp/php${php_version}-curl
 graphics/ImageMagick7@nox11
 graphics/drm-kmod
 graphics/p5-Image-ExifTool
@@ -27,6 +32,7 @@ irc/konversation
 irc/znc
 java/eclipse
 java/openjdk17
+lang/php${php_version}
 mail/dma
 mail/dovecot
 mail/dovecot-pigeonhole
@@ -35,6 +41,7 @@ mail/mutt
 mail/postfix
 mail/rspamd
 mail/sieve-connect
+misc/php${php_version}-calendar
 multimedia/jellyfin
 multimedia/libva-intel-media-driver
 multimedia/makemkv
@@ -54,6 +61,7 @@ net/freeradius3
 net/nss-pam-ldapd-sasl
 net/openldap26-client
 net/openldap26-server
+net/php${php_version}-ldap
 net/rsync
 net/syncthing
 ports-mgmt/poudriere
@@ -76,7 +84,9 @@ sysutils/stow
 sysutils/tmux
 sysutils/tree
 textproc/jq
-www/davical
+textproc/php${php_version}-xml
+www/php${php_version}-opcache
+www/php${php_version}-session
 www/firefox
 www/nginx
 www/tt-rss

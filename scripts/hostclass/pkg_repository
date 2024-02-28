@@ -30,9 +30,9 @@ pkg install -y \
 # Generate poudriere configuration.
 install_template -m 0644           \
   /usr/local/etc/poudriere.conf    \
- "${poudriere_conf_dir}/make.conf"
+ "${poudriere_conf_dir}/make.conf" \
+ "${poudriere_conf_dir}/pkglist"
 install_file -m 0400 /usr/local/etc/ssl/repo.key
-install_file -m 0644 "${poudriere_conf_dir}/pkglist"
 install_directory -m 0755 /usr/ports/distfiles
 install_directory -m 0755 -o nobody -g nobody "${poudriere_data_dir}/ccache"
 install_template -m 0644 -o nobody -g nobody "${poudriere_data_dir}/ccache/ccache.conf"
