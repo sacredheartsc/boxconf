@@ -30,7 +30,7 @@ create_dataset -o "mountpoint=${dovecot_vmail_dir}" "${state_dataset}/mailboxes"
 install_directory -m 0770 -o "$dovecot_vmail_user" -g "$dovecot_vmail_user" "$dovecot_vmail_dir"
 
 # Create service principals and keytab.
-create_krb5_service "imap/${fqdn}" "sieve/${fqdn}"
+create_service "imap/${fqdn}" "sieve/${fqdn}"
 get_keytab           \
   -o root            \
   -g "$dovecot_user" \
@@ -103,7 +103,4 @@ service kstart restart
 service dovecot restart
 
 # Create mail access role.
-ldap_add "cn=${mail_access_role},${roles_basedn}" <<EOF
-objectClass: groupOfMembers
-cn: ${mail_access_role}
-EOF
+create_role "$mail_access_role"

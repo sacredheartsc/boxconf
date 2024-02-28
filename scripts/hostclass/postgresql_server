@@ -34,7 +34,7 @@ sysrc -v postgresql_enable=YES
 [ -d "${postgres_data_dir}" ] || service postgresql initdb
 
 # Create service principal and keytab.
-create_krb5_service "postgres/${fqdn}"
+create_service "postgres/${fqdn}"
 get_keytab            \
   -o root             \
   -g "$postgres_user" \

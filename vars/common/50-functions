@@ -19,12 +19,11 @@ BOXCONF_CLEANUP_PATHS="${BOXCONF_CLEANUP_PATHS} ${boxconf_ccache} ${boxconf_test
 boxconf_kinit(){
   klist -c "$boxconf_ccache" -t \
     || printf '%s' "$boxconf_password" \
-      | kinit -c "$boxconf_ccache" --password-file=STDIN "${boxconf_user}@${realm}"
+      | kinit -c "$boxconf_ccache" --password-file=STDIN "${boxconf_user}@${realm}" "$@"
 }
 
 get_keytab(){
   # $1 = keytab, $2..$n = princ
-
   _gkt_owner=0
   _gkt_group=0
   _gkt_mode=600
@@ -100,7 +99,131 @@ ${2}: ${3}
 EOF
 }
 
-create_krb5_service(){
+boxconf_psql(){
+  boxconf_kinit && KRB5CCNAME="$boxconf_ccache" psql \
+    --no-align                                       \
+    --echo-all                                       \
+    --tuples-only                                    \
+    --no-password                                    \
+    --username="$boxconf_user"                       \
+    "$@"
+}
+create_postgres_user(){
+  # $1 = postgres_host, $2 = username
+  cat <<EOF | boxconf_psql -h "${1}" -d postgres
+SELECT 'CREATE ROLE "${2}" WITH LOGIN' WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${2}')\\gexec
+EOF
+}
+
+create_postgres_db(){
+  # $1 = postgres_host, $2 = dbname
+  cat <<EOF | boxconf_psql -h "${1}" -d postgres
+SELECT 'CREATE DATABASE "${2}"' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '${2}')\\gexec
+EOF
+}
+
+create_robot(){
+  unset _crb_comment _crb_homedir _crb_shell _crb_uid
+
+  while getopts c:d:s:u:g: _crb_opt; do
+    case $_crb_opt in
+      c) _crb_comment=$OPTARG ;;
+      d) _crb_homedir=$OPTARG ;;
+      s) _crb_shell=$OPTARG ;;
+      u) _crb_uid=$OPTARG ;;
+    esac
+  done
+  shift $((OPTIND - 1))
+
+  _crb_name=$1; shift
+
+  ldap_add "cn=${_crb_name},${private_groups_basedn}" <<EOF
+objectClass: groupOfMembers
+objectClass: posixGroup
+cn: ${_crb_name}
+gidNumber: ${_crb_uid}
+member: uid=${_crb_name},${robots_basedn}
+EOF
+
+  ldap_add "uid=${_crb_name},${robots_basedn}" <<EOF
+objectClass: account
+objectClass: posixAccount
+objectClass: krb5KDCEntry
+uid: ${_crb_name}
+cn: ${_crb_comment:-${_crb_name}}
+uidNumber: ${_crb_uid}
+gidNumber: ${_crb_uid}
+homeDirectory: ${_crb_homedir:-/nonexistent}
+loginShell: ${_crb_shell:-/sbin/nologin}
+gecos: ${_crb_comment:-${_crb_name}}
+userPassword: {SASL}${_crb_name}@${realm}
+krb5PrincipalName: ${_crb_name}@${realm}
+krb5KeyVersionNumber: 0
+krb5MaxLife: ${krb5_max_ticket_lifetime}
+krb5MaxRenew: ${krb5_max_renew_lifetime}
+krb5KDCFlags: ${krb5_default_princ_flags}
+EOF
+}
+
+create_group(){
+  unset _cg_email _cg_gid
+  while getopts e:g: _cg_opt; do
+    case $_cg_opt in
+      e) _cg_email=$OPTARG ;;
+      g) _cg_gid=$OPTARG ;;
+    esac
+  done
+  shift $((OPTIND - 1))
+
+  _cg_name=$1; shift
+
+  if [ -n "${_cg_email:-}" ]; then
+    ldap_add "cn=${_cg_name},${groups_basedn}" <<EOF
+objectClass: groupOfMembers
+objectClass: posixGroup
+objectClass: mailRecipient
+cn: ${_cg_name}
+gidNumber: ${_cg_gid}
+mailAddress: ${_cg_email}
+mail: ${_cg_email}
+EOF
+  else
+    ldap_add "cn=${_cg_name},${groups_basedn}" <<EOF
+objectClass: groupOfMembers
+objectClass: posixGroup
+cn: ${_cg_name}
+gidNumber: ${_cg_gid}
+EOF
+  fi
+}
+
+create_role(){
+  unset _crl_gid
+  while getopts g: _crl_opt; do
+    case $_cg_opt in
+      g) _crl=$OPTARG ;;
+    esac
+  done
+  shift $((OPTIND - 1))
+
+  _crl_name=$1; shift
+
+  if [ -n "${_crl_gid:-}" ]; then
+    ldap_add "cn=${_crl_name},${roles_basedn}" <<EOF
+objectClass: groupOfMembers
+objectClass: posixGroup
+cn: ${_crl_name}
+gidNumber: ${_crl_gid}
+EOF
+  else
+    ldap_add "cn=${_crl_name},${roles_basedn}" <<EOF
+objectClass: groupOfMembers
+cn: ${_crl_name}
+EOF
+  fi
+}
+
+create_service(){
   while [ $# -gt 0 ]; do
     ldap_add "cn=${1},${services_basedn}" <<EOF
 objectClass: applicationProcess
@@ -115,15 +238,4 @@ krb5MaxRenew: ${krb5_max_renew_lifetime}
 EOF
     shift
   done
-}
-
-boxconf_psql(){
-  boxconf_kinit && KRB5CCNAME="$boxconf_ccache" psql \
-    --quiet                             \
-    --no-align                          \
-    --echo-all                          \
-    --tuples-only                       \
-    --no-password                       \
-    --host="${postgres_host}.${domain}" \
-    "$@"
 }

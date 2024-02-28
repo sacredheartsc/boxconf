@@ -15,6 +15,7 @@ basedn=$(echo "$domain" | sed -e 's/^/dc=/' -e 's/\./,dc=/g')
 resolvers=$(echo "$slapd_server_ids" | awk '{print $2}')
 
 ldap_uri=$(printf "ldap://%s.${domain}/ " $idm_servers)
+ldap_hosts=$(printf "%s.${domain} " $idm_servers)
 accounts_basedn="ou=accounts,${basedn}"
 people_basedn="ou=people,${accounts_basedn}"
 robots_basedn="ou=robots,${accounts_basedn}"

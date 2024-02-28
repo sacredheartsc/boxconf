@@ -10,3 +10,12 @@ install_directory -m 0755  \
 install_ca_certificate "$ca_cert"
 
 certctl rehash
+
+# As of FreeBSD 14.0, the Heimdal distribution in base is incompatible with OpenSSL 3.0
+# due to the RC4 cipher being deprecated:
+#
+# https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=275915
+#
+# Some hostclasses require a special openssl.cnf with the legacy ciphers enabled.
+# Check files/etc/ssl/openssl-legacy.cnf for more details.
+install_file -m 0644 /etc/ssl/openssl.cnf

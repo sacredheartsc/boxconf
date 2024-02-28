@@ -207,6 +207,7 @@ EOF
 ldap_add "cn=${boxconf_user},${private_groups_basedn}" <<EOF
 objectClass: groupOfMembers
 objectClass: posixGroup
+cn: ${boxconf_user}
 gidNumber: ${boxconf_uid}
 member: uid=${boxconf_user},${robots_basedn}
 EOF
@@ -216,6 +217,7 @@ ldap_add "cn=${idm_admin_group},${groups_basedn}" <<EOF
 objectClass: groupOfMembers
 objectClass: posixGroup
 objectClass: mailRecipient
+cn: ${idm_admin_group}
 gidNumber: ${idm_admin_gid}
 mailAddress: ${idm_admin_group}@${email_domain}
 EOF

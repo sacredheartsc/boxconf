@@ -1,8 +1,6 @@
 worker_processes      ${nginx_worker_processes};
 worker_rlimit_nofile  ${nginx_nofile};
 
-load_module /usr/local/libexec/nginx/ngx_http_auth_spnego_module.so;
-
 events {
   worker_connections  ${nginx_worker_connections};
 }
@@ -36,9 +34,6 @@ http {
   ssl_session_tickets        off;
   ssl_protocols              TLSv1.3;
   ssl_prefer_server_ciphers  off;
-
-  auth_gss_realm         ${realm};
-  auth_gss_service_name  HTTP/${fqdn};
 
   map \$http_upgrade \$connection_upgrade {
     default upgrade;

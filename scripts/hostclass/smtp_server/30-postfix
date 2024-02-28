@@ -6,7 +6,7 @@ pkg install -y         \
   cyrus-sasl-saslauthd
 
 # Create SMTP service principal and keytab.
-create_krb5_service "smtp/${fqdn}"
+create_service "smtp/${fqdn}"
 get_keytab           \
   -o root            \
   -g "$postfix_user" \

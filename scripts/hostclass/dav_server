@@ -2,48 +2,66 @@
 
 : ${davical_user:='s-davical'}
 : ${davical_uid:='20001'}
+: ${davical_dbname:='davical'}
+: ${davical_dbhost:="${postgres_host}.${domain}"}
+: ${davical_admin_email:="$root_email"}
+: ${dav_access_role:='role-dav-access'}
 
-davical_www_dir=/usr/local/www/davical
-davical_script_dir=/usr/local/share/davical
+davical_repo=https://gitlab.com/sacredheartsc/davical.git/
+davical_branch=dev
+
+davical_awl_repo=https://gitlab.com/davical-project/awl.git/
+davical_awl_branch=master
+
+davical_repo_dir=/usr/local/www/davical
+davical_awl_repo_dir=/usr/local/share/awl
+davical_webroot="${davical_repo_dir}/htdocs"
+
 davical_tls_cert=/usr/local/etc/nginx/davical.crt
 davical_tls_key=/usr/local/etc/nginx/davical.key
 davical_keytab="${keytab_dir}/davical.keytab"
 davical_client_keytab="${keytab_dir}/davical-client.keytab"
+davical_fpm_socket=/var/run/fpm-davical.sock
+
+davical_psql(){
+  boxconf_psql                 \
+    --host="$davical_dbhost"   \
+    --dbname="$davical_dbname" \
+    "$@"
+}
 
 # Install required packages.
 pkg install -y                \
-  "davical-php${php_version}" \
+  git                         \
   kstart                      \
-  "php${php_version}-ldap"    \
-  nginx
+  nginx                       \
+  php${php_version}           \
+  php${php_version}-calendar  \
+  php${php_version}-curl      \
+  php${php_version}-gettext   \
+  php${php_version}-iconv     \
+  php${php_version}-ldap      \
+  php${php_version}-pdo_pgsql \
+  php${php_version}-pgsql     \
+  php${php_version}-session   \
+  php${php_version}-xml
+
+# Install davical from git.
+[ -d "$davical_repo_dir" ]     || git clone "$davical_repo"     "$davical_repo_dir"
+[ -d "$davical_awl_repo_dir" ] || git clone "$davical_awl_repo" "$davical_awl_repo_dir"
+
+# Update git repos.
+git -C "$davical_repo_dir"     pull --ff-only
+git -C "$davical_repo_dir"     switch "$davical_branch"
+git -C "$davical_awl_repo_dir" pull --ff-only
+git -C "$davical_awl_repo_dir" switch "$davical_awl_branch"
 
 # Create davical user account.
-ldap_add "uid=${davical_user},${robots_basedn}" <<EOF
-objectClass: account
-objectClass: posixAccount
-objectClass: krb5KDCEntry
-uid: ${davical_user}
-cn: ${davical_user}
-uidNumber: ${davical_uid}
-gidNumber: ${davical_uid}
-homeDirectory: ${davical_script_dir}
-loginShell: /sbin/nologin
-gecos: Davical Pseudo-User
-userPassword: {SASL}${davical_user}@${realm}
-krb5PrincipalName: ${davical_user}@${realm}
-krb5KeyVersionNumber: 0
-krb5MaxLife: ${krb5_max_ticket_lifetime}
-krb5MaxRenew: ${krb5_max_renew_lifetime}
-krb5KDCFlags: ${krb5_default_princ_flags}
-EOF
-
-# Create davical private group.
-ldap_add "cn=${davical_user},${private_groups_basedn}" <<EOF
-objectClass: groupOfMembers
-objectClass: posixGroup
-gidNumber: ${davical_uid}
-member: uid=${davical_user},${robots_basedn}
-EOF
+create_robot               \
+  -c "Davical Pseudo-User" \
+  -u "$davical_uid"        \
+  -d "$davical_repo_dir"   \
+  "$davical_user"
 
 # Get keytab for davical user.
 get_keytab                  \
@@ -54,21 +72,32 @@ get_keytab                  \
   "$davical_user"
 
 # Generate davical configuration.
-install_template -m 0644 "${davical_www_dir}/config/config.php"
+install_template -m 0644                          \
+  "${davical_repo_dir}/config/config.php"         \
+  "${davical_repo_dir}/config/administration.yml"
+
+# Create postgres user and database.
+create_postgres_user "$davical_dbhost" "$davical_user"
+create_postgres_db   "$davical_dbhost" "$davical_dbname"
 
 # Initialize davical database.
-# TODO
-
-# Sync groups from LDAP.
-# TODO
-
-# Create cron job for keeping LDAP groups up-to-date.
-# TODO
+if ! davical_psql -c 'SELECT 1 FROM awl_db_revision'; then
+  davical_psql                                             \
+    -f "${davical_awl_repo_dir}/dba/awl-tables.sql"        \
+    -f "${davical_awl_repo_dir}/dba/schema-management.sql" \
+    -f "${davical_repo_dir}/dba/davical.sql"
+  boxconf_kinit "${davical_repo_dir}/dba/update-davical-database" --nopatch
+  davical_psql -f "${davical_repo_dir}/dba/base-data.sql"
+  boxconf_kinit "${davical_repo_dir}/dba/update-davical-database"
+  boxconf_psql -c "delete from usr where username = 'admin';"
+fi
 
 # Create HTTP service principal and keytab.
-create_krb5_service "HTTP/${fqdn}"
+create_service "HTTP/${fqdn}"
 get_keytab           \
-  -m 0600            \
+  -m 0640            \
+  -o root            \
+  -g www             \
   "$davical_keytab"  \
   "HTTP/${fqdn}"
 
@@ -77,13 +106,17 @@ install_certificate     -m 0644 "$fqdn" "$davical_tls_cert"
 install_certificate_key -m 0600 "$fqdn" "$davical_tls_key"
 
 # Generate nginx configuration.
-install_template -m 0644 /usr/local/etc/nginx.conf
+install_file -m 0644 /etc/ssl/openssl-legacy.cnf
+install_template -m 0644           \
+  /usr/local/etc/nginx/nginx.conf  \
+  /usr/local/etc/nginx/vhosts.conf
 
 # Generate php-fpm configuration.
-install_template -m 0644           \
+install_file -m 0644               \
   /usr/local/etc/php.ini           \
-  /usr/local/etc/php-fpm.conf      \
-  /usr/local/etc/php-fpm.d/davical
+  /usr/local/etc/php-fpm.conf
+install_template -m 0644                \
+  /usr/local/etc/php-fpm.d/davical.conf
 rm -f /usr/local/etc/php-fpm.d/www.conf
 
 # Enable and start daemons.
@@ -93,7 +126,15 @@ sysrc -v                                         \
   kstart_instances+=davical                      \
   kstart_davical_keytab="$davical_client_keytab" \
   kstart_davical_flags="-aLK 120 -g ${davical_uid} -o ${davical_uid} -k /tmp/krb5cc_${davical_uid} -u ${davical_user}"
-
 service kstart restart
 service nginx restart
 service php-fpm restart
+
+# Sync groups from LDAP.
+su -m "$davical_user" -c "${davical_repo_dir}/scripts/cron-sync-ldap.php ${fqdn}"
+
+# Create cron job for keeping LDAP groups up-to-date.
+install_template -m 0644 /etc/cron.d/davical-update-groups
+
+# Create dav access role.
+create_role "$dav_access_role"

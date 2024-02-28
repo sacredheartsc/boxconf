@@ -63,12 +63,7 @@ install_certificate_key -m 0600 "dc=${BOXCONF_HOSTNAME},${hosts_basedn}" "$wifi_
 install_template -m 0644 /etc/wpa_supplicant.conf
 
 # Create desktop access role.
-ldap_add "cn=${desktop_access_role},${roles_basedn}" <<EOF
-objectClass: groupOfMembers
-objectClass: posixGroup
-cn: ${desktop_access_role}
-gidNumber: ${desktop_access_gid}
-EOF
+create_role -g "$desktop_access_gid" "$desktop_access_role"
 
 # Create polkit rules for shutdown/reboot/suspend
 install_template -m 0644 /usr/local/etc/polkit-1/rules.d/51-desktop-access.rules
