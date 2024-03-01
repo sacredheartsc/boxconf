@@ -8,8 +8,8 @@ server {
 }
 
 server {
-  listen 443      ssl http2;
-  listen [::]:443 ssl http2;
+  listen 443      ssl http2 default_server;
+  listen [::]:443 ssl http2 default_server;
 
   root ${davical_webroot};
   index index.html index.php;
@@ -19,15 +19,29 @@ server {
 
   add_header Strict-Transport-Security "max-age=63072000" always;
 
-  rewrite ^/\.well-known(.*)$      /caldav.php/.well-known\$1;
-  rewrite ^/principals/users(.*)$  /caldav.php\$1;
-
   auth_gss on;
   auth_gss_keytab ${davical_keytab};
   auth_gss_allow_basic_fallback on;
 
   location / {
-    try_files \$uri \$uri/ /index.php?\$query_string;
+    try_files \$uri \$uri/ /caldav.php\$uri?\$query_string;
+  }
+
+  location /.well-known/ {
+    auth_gss off;
+    try_files \$uri \$uri/ /caldav.php\$uri?\$query_string;
+  }
+
+  location ~ ^/caldav\.php/\.well-known/ {
+    auth_gss off;
+    fastcgi_split_path_info ^(.+?\.php)(/.*)$;
+    if (!-f \$document_root\$fastcgi_script_name) {
+      return 404;
+    }
+    fastcgi_index index.php;
+    fastcgi_intercept_errors on;
+    include fastcgi_params;
+    fastcgi_pass unix:${davical_fpm_socket};
   }
 
   location ~ [^/]\.php(/|$) {
@@ -38,9 +52,6 @@ server {
     fastcgi_index index.php;
     fastcgi_intercept_errors on;
     include fastcgi_params;
-    fastcgi_param HTTP_PROXY "";
-    fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
-    fastcgi_param REMOTE_USER     \$remote_user if_not_empty;
     fastcgi_pass unix:${davical_fpm_socket};
   }
 }

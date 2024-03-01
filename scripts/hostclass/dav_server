@@ -7,8 +7,8 @@
 : ${davical_admin_email:="$root_email"}
 : ${dav_access_role:='role-dav-access'}
 
-davical_repo=https://gitlab.com/sacredheartsc/davical.git/
-davical_branch=ldap-sasl-bind-support
+davical_repo=https://gitlab.com/davical-project/davical.git/
+davical_branch=master
 
 davical_awl_repo=https://gitlab.com/davical-project/awl.git/
 davical_awl_branch=master
@@ -41,6 +41,7 @@ pkg install -y                \
   php${php_version}-gettext   \
   php${php_version}-iconv     \
   php${php_version}-ldap      \
+  php${php_version}-opcache   \
   php${php_version}-pdo_pgsql \
   php${php_version}-pgsql     \
   php${php_version}-session   \
@@ -106,7 +107,9 @@ install_certificate     -m 0644 "$fqdn" "$davical_tls_cert"
 install_certificate_key -m 0600 "$fqdn" "$davical_tls_key"
 
 # Generate nginx configuration.
-install_file -m 0644 /etc/ssl/openssl-legacy.cnf
+install_file -m 0644                  \
+  /etc/ssl/openssl-legacy.cnf         \
+  /usr/local/etc/nginx/fastcgi_params
 install_template -m 0644           \
   /usr/local/etc/nginx/nginx.conf  \
   /usr/local/etc/nginx/vhosts.conf
