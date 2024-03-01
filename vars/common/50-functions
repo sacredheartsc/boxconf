@@ -118,9 +118,9 @@ EOF
 }
 
 create_postgres_db(){
-  # $1 = postgres_host, $2 = dbname
+  # $1 = postgres_host, $2 = dbname, $3 = owner
   cat <<EOF | boxconf_psql -h "${1}" -d postgres
-SELECT 'CREATE DATABASE "${2}"' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '${2}')\\gexec
+SELECT 'CREATE DATABASE "${2}" OWNER "${3:-postgres}"' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '${2}')\\gexec
 EOF
 }
 

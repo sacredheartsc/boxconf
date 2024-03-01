@@ -1,0 +1,67 @@
+#!/bin/sh
+
+: ${vaultwarden_user:='s-vaultwarden'}
+: ${vaultwarden_uid:='20002'}
+: ${vaultwarden_dbname:='vaultwarden'}
+: ${vaultwarden_dbhost:="${postgres_host}.${domain}"}
+: ${vaultwarden_hostname:="$BOXCONF_HOSTNAME"}
+
+vaultwarden_tls_cert=/usr/local/etc/nginx/vaultwarden.crt
+vaultwarden_tls_key=/usr/local/etc/nginx/vaultwarden.key
+vaultwarden_home=/usr/local/www/vaultwarden
+vaultwarden_port=8080
+
+vaultwarden_client_keytab="${keytab_dir}/vaultwarden-client.keytab"
+
+pkg install -y \
+  vaultwarden  \
+  kstart       \
+  nginx
+
+# Create vaultwarden user account.
+create_robot               \
+  -c "Vaultwarden Pseudo-User" \
+  -u "$vaultwarden_uid"        \
+  -d "$vaultwarden_home"   \
+  "$vaultwarden_user"
+
+# Get keytab for vaultwarden user.
+get_keytab                     \
+  -o root                      \
+  -g "$vaultwarden_user"       \
+  -m 0640                      \
+  "$vaultwarden_client_keytab" \
+  "$vaultwarden_user"
+
+# Create postgres user and database.
+create_postgres_user "$vaultwarden_dbhost" "$vaultwarden_user"
+create_postgres_db   "$vaultwarden_dbhost" "$vaultwarden_dbname" "$vaultwarden_user"
+
+# Generate vaultwarden configuration.
+install_template -m 0600 /usr/local/etc/rc.conf.d/vaultwarden
+
+# Copy TLS certificate for nginx.
+install_certificate     -m 0644 "$fqdn" "$vaultwarden_tls_cert"
+install_certificate_key -m 0600 "$fqdn" "$vaultwarden_tls_key"
+
+# Generate nginx configuration.
+install_template -m 0644           \
+  /usr/local/etc/nginx/nginx.conf  \
+  /usr/local/etc/nginx/vhosts.conf
+
+# Enable and start daemons.
+sysrc -v                                                 \
+  vaultwarden_enable=YES                                 \
+  vaultwarden_user="$vaultwarden_user"                   \
+  vaultwarden_group="$vaultwarden_user"                  \
+  nginx_enable=YES                                       \
+  kstart_instances+=vaultwarden                          \
+  kstart_vaultwarden_keytab="$vaultwarden_client_keytab" \
+  kstart_vaultwarden_flags="-aLK 120 -g ${vaultwarden_uid} -o ${vaultwarden_uid} -k /tmp/krb5cc_${vaultwarden_uid} -u ${vaultwarden_user}"
+
+service nginx restart
+
+# The vaultwarden rc script seems to hold onto open descriptors, which causes
+# the parent boxconf SSH process to never close.
+echo 'Restarting vaultwarden.'
+service vaultwarden restart > /dev/null 2>&1 < /dev/null
