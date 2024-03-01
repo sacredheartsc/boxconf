@@ -30,10 +30,10 @@ graphics/drm-kmod
 graphics/p5-Image-ExifTool
 irc/konversation
 irc/znc
+# irc/znc-clientbuffer # BROKEN
 java/eclipse
 java/openjdk17
 lang/php${php_version}
-mail/dma
 mail/dovecot
 mail/dovecot-pigeonhole
 mail/isync
