@@ -60,11 +60,15 @@ for version in $poudriere_versions; do
 
   [ -d "${poudriere_data_dir}/jails/${jail}" ] || poudriere jail -c -j "$jail" -v "$version"
   poudriere jail -u -j "$jail"
-  poudriere bulk -v -j "$jail" -f ${poudriere_conf_dir}/pkglist -p latest
+  poudriere bulk -v -j "$jail" -f "${poudriere_conf_dir}/pkglist" -p latest
+  poudriere pkgclean -v -j "$jail" -f "${poudriere_conf_dir}/pkglist" -p latest -y
 
   install_directory -m 0755 "${poudriere_data_dir}/data/packages/${abi}"
   ln -snfv "../${jail}-latest" "${poudriere_data_dir}/data/packages/${abi}/latest"
 done
+
+# Clean stale distfiles.
+poudriere distclean -v -a -p latest -y
 
 # Add an empty directory named "poudriere" in the webroot, just so we can easily
 # click on something in the autoindex page that takes us to the Poudriere interface.

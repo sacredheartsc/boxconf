@@ -10,4 +10,7 @@ poudriere ports -u -p "$ports_tree" > /dev/null
 for jail in "$@"; do
   poudriere jail -u -j "$jail" > /dev/null
   poudriere bulk -j "$jail" -f  /usr/local/etc/poudriere.d/pkglist -p "$ports_tree" > /dev/null
+  poudriere pkgclean -j "$jail" -f /usr/local/etc/poudriere.d/pkglist -p "$ports_tree" -y > /dev/null
 done
+
+poudriere distclean -p "$ports_tree" -a -y > /dev/null

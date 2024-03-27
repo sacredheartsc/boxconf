@@ -1,0 +1,150 @@
+#!/bin/sh
+
+: ${ttrss_user:='s-ttrss'}
+: ${ttrss_uid:='20003'}
+: ${ttrss_dbname:='ttrss'}
+: ${ttrss_dbhost:="${postgres_host}.${domain}"}
+: ${ttrss_hostname:="$BOXCONF_HOSTNAME"}
+: ${ttrss_access_role:='ttrss-access'}
+: ${ttrss_admin_role:='ttrss-admin'}
+
+ttrss_tls_cert=/usr/local/etc/nginx/ttrss.crt
+ttrss_tls_key=/usr/local/etc/nginx/ttrss.key
+ttrss_repo=https://git.tt-rss.org/fox/tt-rss.git/
+ttrss_branch=master
+ttrss_repo_dir=/usr/local/www/tt-rss
+ttrss_keytab="${keytab_dir}/ttrss.keytab"
+ttrss_client_keytab="${keytab_dir}/ttrss-client.keytab"
+ttrss_fpm_socket=/var/run/fpm-ttrss.sock
+
+ttrss_psql(){
+  boxconf_psql               \
+    --host="$ttrss_dbhost"   \
+    --dbname="$ttrss_dbname" \
+    "$@"
+}
+
+# Install required packages.
+pkg install -y                \
+  kstart                      \
+  nginx                       \
+  php${php_version}-ctype     \
+  php${php_version}-curl      \
+  php${php_version}-dom       \
+  php${php_version}-exif      \
+  php${php_version}-fileinfo  \
+  php${php_version}-filter    \
+  php${php_version}-gd        \
+  php${php_version}-iconv     \
+  php${php_version}-intl      \
+  php${php_version}-ldap      \
+  php${php_version}-mbstring  \
+  php${php_version}-opcache   \
+  php${php_version}-pcntl     \
+  php${php_version}-pdo       \
+  php${php_version}-pdo_pgsql \
+  php${php_version}-pgsql     \
+  php${php_version}-phar      \
+  php${php_version}-posix     \
+  php${php_version}-session   \
+  php${php_version}-simplexml \
+  php${php_version}-sockets   \
+  php${php_version}-tokenizer \
+  php${php_version}-xml       \
+  php${php_version}-xmlwriter \
+  php${php_version}-zip
+
+# Create ttrss user account.
+create_robot             \
+  -c "TTRSS Pseudo-User" \
+  -u "$ttrss_uid"        \
+  -d "$ttrss_repo_dir"   \
+  "$ttrss_user"
+
+# Get keytab for ttrss user.
+get_keytab               \
+  -o root                \
+  -g "$ttrss_user"       \
+  -m 0640                \
+  "$ttrss_client_keytab" \
+  "$ttrss_user"
+
+# Install ttrss from git.
+[ -d "$ttrss_repo_dir" ] || git clone "$ttrss_repo" "$ttrss_repo_dir"
+
+# Update git repos.
+git -C "$ttrss_repo_dir" pull --ff-only
+git -C "$ttrss_repo_dir" switch "$ttrss_branch"
+
+# Fix permissions on writable directories.
+for dir in lock cache feed-icons ; do
+  chmod 755 "${ttrss_repo_dir}/${dir}"
+  chown -R "${ttrss_user}:www" "${ttrss_repo_dir}/${dir}"
+done
+
+# Generate config.php.
+install_template -m 0644 "${ttrss_repo_dir}/config.php"
+
+# Create postgres user and database.
+create_postgres_user "$ttrss_dbhost" "$ttrss_user"
+create_postgres_db   "$ttrss_dbhost" "$ttrss_dbname" "$ttrss_user"
+
+# Initialize the database schema.
+su -m "$ttrss_user" -c "${ttrss_repo_dir}/update.php --update-schema=force-yes"
+
+# Copy tt-rss LDAP auth plugin.
+install_directory -m 0755 "${ttrss_repo_dir}/plugins.local/auth_idm"
+install_file -m 0644 "${ttrss_repo_dir}/plugins.local/auth_idm/init.php"
+
+# Copy tt-rss rc script.
+install_file -m 0555 /usr/local/etc/rc.d/ttrssd
+
+# Allow ttrss user to perform git queries.
+git config --system --replace-all safe.directory "$ttrss_repo_dir"
+
+# Copy TLS certificate for nginx.
+install_certificate     -m 0644 "$fqdn" "$ttrss_tls_cert"
+install_certificate_key -m 0600 "$fqdn" "$ttrss_tls_key"
+
+# Create HTTP service principal and keytab.
+create_service "HTTP/${fqdn}"
+get_keytab        \
+  -m 0640         \
+  -o root         \
+  -g www          \
+  "$ttrss_keytab" \
+  "HTTP/${fqdn}"
+
+# Generate nginx configuration.
+install_file -m 0644                  \
+  /etc/ssl/openssl-legacy.cnf         \
+  /usr/local/etc/nginx/fastcgi_params
+install_template -m 0644           \
+  /usr/local/etc/nginx/nginx.conf  \
+  /usr/local/etc/nginx/vhosts.conf
+
+# Generate php-fpm configuration.
+install_file -m 0644               \
+  /usr/local/etc/php.ini           \
+  /usr/local/etc/php-fpm.conf
+install_template -m 0644                \
+  /usr/local/etc/php-fpm.d/ttrss.conf
+rm -f /usr/local/etc/php-fpm.d/www.conf
+
+# Enable and start daemons.
+sysrc -v                                     \
+  nginx_enable=YES                           \
+  php_fpm_enable=YES                         \
+  ttrssd_enable=YES                          \
+  kstart_instances+=ttrss                    \
+  kstart_ttrss_keytab="$ttrss_client_keytab" \
+  kstart_ttrss_flags="-aLK 120 -g ${ttrss_uid} -o ${ttrss_uid} -k /tmp/krb5cc_${ttrss_uid} -u ${ttrss_user}"
+
+for svc in kstart nginx php-fpm ttrssd; do
+  service "$svc" restart
+done
+
+# Create roles.
+create_role            \
+  "$ttrss_access_role" \
+  "$ttrss_admin_role"

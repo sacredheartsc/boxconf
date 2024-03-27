@@ -17,6 +17,8 @@ slapd_server_ids="\
 1 10.11.199.2
 2 10.11.199.3"
 
+kerberized_cidrs='10.11.199.0/24'
+
 # Generate with `rspamadm keypair`. Set corresponding private key in ./90-vault:
 rspamd_pubkey='uedcfqt9j4q3rassh3ajog7qti64s643rdti9ea38supj9eayddy'
 

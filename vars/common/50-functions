@@ -107,6 +107,7 @@ boxconf_psql(){
     --echo-all                                       \
     --tuples-only                                    \
     --no-password                                    \
+    -v ON_ERROR_STOP=1                               \
     --username="$boxconf_user"                       \
     "$@"
 }
@@ -208,21 +209,22 @@ create_role(){
   done
   shift $((OPTIND - 1))
 
-  _crl_name=$1; shift
-
-  if [ -n "${_crl_gid:-}" ]; then
-    ldap_add "cn=${_crl_name},${roles_basedn}" <<EOF
+  while [ $# -gt 0 ]; do
+    if [ -n "${_crl_gid:-}" ]; then
+      ldap_add "cn=${1},${roles_basedn}" <<EOF
 objectClass: groupOfMembers
 objectClass: posixGroup
-cn: ${_crl_name}
+cn: ${1}
 gidNumber: ${_crl_gid}
 EOF
-  else
-    ldap_add "cn=${_crl_name},${roles_basedn}" <<EOF
+    else
+      ldap_add "cn=${1},${roles_basedn}" <<EOF
 objectClass: groupOfMembers
-cn: ${_crl_name}
+cn: ${1}
 EOF
-  fi
+    fi
+    shift
+  done
 }
 
 create_service(){
