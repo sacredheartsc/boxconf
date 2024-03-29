@@ -104,3 +104,6 @@ service dovecot restart
 
 # Create mail access role.
 create_role "$mail_access_role"
+
+# Disable rspamd log rotation (we don't actually run rspamd here).
+rm -f /usr/local/etc/newsyslog.conf.d/rspamd.newsyslog.conf

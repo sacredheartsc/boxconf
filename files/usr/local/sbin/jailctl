@@ -1041,6 +1041,7 @@ interface::epair::derive_mac(){
   # + I denotes bits that are inherited from parent interface.
   #
   # The S bits are a CRC-16 checksum of NAME, allowing the jail
+  #   [NOTE: switched to md5sum below - easy to get conflicts!]
   # to change link numbers in ng_bridge(4) without affecting the
   # MAC address. Meanwhile, if...
   #   + the jail NAME changes (e.g., it was duplicated and given
@@ -1056,19 +1057,23 @@ interface::epair::derive_mac(){
   epair_mac_a=${hwaddr#??:??:??} # => :II:II:II
 
   # => :SS:SS:II:II:II
-  checksum=$(printf '%s' "$name" | sum | cut -d' ' -f1)
-  epair_mac_a="$(printf ':%02x:%02x' "$(( checksum >> 8 & 255 ))" "$(( checksum & 255 ))")${epair_mac_a}"
-
-  # => P:SS:SS:II:II:II
-  case $hwaddr in
-    ?2:*)    epair_mac_a="a${epair_mac_a}"  epair_mac_b="e${epair_mac_a}" ;;
-    ?[Ee]:*) epair_mac_a="2${epair_mac_a}"  epair_mac_b="6${epair_mac_a}" ;;
-    *)       epair_mac_a="2${epair_mac_a}"  epair_mac_b="e${epair_mac_a}" ;;
-  esac
+  epair_mac_a=":$(printf '%s' "$name" | md5 | sed 's/^\(..\)\(..\).*/\1:\2/')${epair_mac_a}"
 
   # => NP:SS:SS:II:II:II
-  setvar "$upvar_a" "0${epair_mac_a}"
-  setvar "$upvar_b" "0${epair_mac_b}"
+  case $hwaddr in
+    ?2:*)    epair_mac_a="0a${epair_mac_a}"  epair_mac_b="0e${epair_mac_a}" ;;
+    ?[Ee]:*) epair_mac_a="02${epair_mac_a}"  epair_mac_b="06${epair_mac_a}" ;;
+    *)       epair_mac_a="02${epair_mac_a}"  epair_mac_b="0e${epair_mac_a}" ;;
+  esac
+
+  # Sanity check for duplicate MAC
+  for mac in $epair_mac_a $epair_mac_b; do
+    ifconfig | grep -qE "(ether|hwaddr) ${mac}" && die "MAC collision when configuring epair interface!"
+  done
+
+  # => NP:SS:SS:II:II:II
+  setvar "$upvar_a" "$epair_mac_a"
+  setvar "$upvar_b" "$epair_mac_b"
 }
 
 interface::epair::derive_name(){

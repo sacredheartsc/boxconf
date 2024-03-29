@@ -1,0 +1,6 @@
+ldap_servers: ${ldap_uri}
+ldap_use_sasl: yes
+ldap_mech: GSSAPI
+ldap_search_base: ${people_basedn}
+ldap_scope: one
+ldap_filter: (&(uid=%u)(memberOf=cn=${znc_access_role},${roles_basedn}))
