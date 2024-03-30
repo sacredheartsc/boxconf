@@ -51,7 +51,8 @@ install_directory -m 0755       \
 # Generate dovecot configuration.
 install_template -m 0644                                 \
   "${dovecot_conf_dir}/dovecot.conf"                     \
-  "${dovecot_conf_dir}/dovecot-ldap.conf.ext"            \
+  "${dovecot_conf_dir}/dovecot-ldap-userdb.conf.ext"     \
+  "${dovecot_conf_dir}/dovecot-ldap-passdb.conf.ext"     \
   "${dovecot_conf_dir}/conf.d/10-auth.conf"              \
   "${dovecot_conf_dir}/conf.d/10-mail.conf"              \
   "${dovecot_conf_dir}/conf.d/10-master.conf"            \
@@ -75,7 +76,6 @@ install_file -m 0644                                \
   "${dovecot_conf_dir}/conf.d/20-imap.conf"         \
   "${dovecot_conf_dir}/conf.d/20-lmtp.conf"         \
   "${dovecot_conf_dir}/conf.d/20-managesieve.conf"  \
-  "${dovecot_conf_dir}/conf.d/auth-system.conf.ext" \
   "${dovecot_conf_dir}/report-ham.sieve"            \
   "${dovecot_conf_dir}/report-spam.sieve"           \
   "${dovecot_sieve_before_dir}/10-rspamd.sieve"

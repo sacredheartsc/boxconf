@@ -1,1 +1,1 @@
-auth  required  /usr/local/lib/security/pam_krb5.so try_first_pass no_ccache ignore_k5login no_update_user
+auth required /usr/local/lib/pam_ldap.so

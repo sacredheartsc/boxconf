@@ -1,3 +1,4 @@
 #!/bin/sh
 
 cnames='smtp'
+postfix_public_fqdn=mx2.c0ffee.net

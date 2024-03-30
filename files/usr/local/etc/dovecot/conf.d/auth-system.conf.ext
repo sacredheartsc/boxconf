@@ -1,3 +1,0 @@
-passdb {
-  driver = pam
-}
