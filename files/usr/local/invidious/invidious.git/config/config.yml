@@ -3,7 +3,7 @@ domain: ${invidious_hostname}.${domain}
 external_port: 443
 channel_threads: 1
 feed_threads: 1
-database_url: postgres://${invidious_user}@${invidious_dbhost}/${invidious_dbname}?sslmode=verify-full
+database_url: postgres://${invidious_user}:${invidious_password}@${invidious_dbhost}/${invidious_dbname}?sslmode=verify-full&auth_methods=cleartext
 use_pubsub_feeds: false
 hmac_key: ${invidious_hmac_key}
 https_only: true

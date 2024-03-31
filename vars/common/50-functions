@@ -66,9 +66,16 @@ get_keytab(){
 
 boxconf_kadmin(){
   printf '%s' "$boxconf_password" \
-    | boxconf_kinit -c "$boxconf_ccache" -S "kadmin/admin@${realm}" --password-file=STDIN "${boxconf_user}@${realm}" \
+    | kinit -c "$boxconf_ccache" -S "kadmin/admin@${realm}" --password-file=STDIN "${boxconf_user}@${realm}" \
       && KRB5CCNAME="$boxconf_ccache" kadmin -r "$realm" -p "${boxconf_user}@${realm}" "$@"
 }
+
+set_password(){
+  # $1 = princ, $2 = password
+  printf '%s' "$2" | kinit --password-file=STDIN -c "$boxconf_test_ccache" "$1" true \
+    || boxconf_kadmin passwd -p "$2" "${1}@${realm}"
+}
+
 
 ldap_search(){
   boxconf_kinit && KRB5CCNAME="$boxconf_ccache" ldapsearch -QLLL "$@"
@@ -126,14 +133,15 @@ EOF
 }
 
 create_robot(){
-  unset _crb_comment _crb_homedir _crb_shell _crb_uid
+  unset _crb_comment _crb_homedir _crb_shell _crb_uid _crb_password
 
-  while getopts c:d:s:u:g: _crb_opt; do
+  while getopts c:d:s:u:g:p: _crb_opt; do
     case $_crb_opt in
       c) _crb_comment=$OPTARG ;;
       d) _crb_homedir=$OPTARG ;;
       s) _crb_shell=$OPTARG ;;
       u) _crb_uid=$OPTARG ;;
+      p) _crb_password=$OPTARG ;;
     esac
   done
   shift $((OPTIND - 1))
@@ -166,6 +174,10 @@ krb5MaxLife: ${krb5_max_ticket_lifetime}
 krb5MaxRenew: ${krb5_max_renew_lifetime}
 krb5KDCFlags: ${krb5_default_princ_flags}
 EOF
+
+  if [ -n "${_crb_password:-}" ]; then
+    set_password "$_crb_name" "$_crb_password"
+  fi
 }
 
 create_group(){

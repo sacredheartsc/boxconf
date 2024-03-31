@@ -15,20 +15,26 @@ invidious_tls_cert=/usr/local/etc/nginx/invidious.crt
 invidious_tls_key=/usr/local/etc/nginx/invidious.key
 
 # Install required packages.
-pkg install -y \
-  ca_root_nss  \
-  git          \
-  crystal      \
-  shards       \
-  sqlite3      \
-  nginx
+pkg install -y        \
+  ca_root_nss         \
+  git                 \
+  crystal             \
+  shards              \
+  sqlite3             \
+  nginx               \
+  postgresql15-client
 
 # Create invidious user account.
-create_robot             \
+create_robot                 \
   -c "Invidious Pseudo-User" \
   -u "$invidious_uid"        \
   -d "$invidious_home"       \
+  -p "$invidious_password"   \
   "$invidious_user"
+
+# Create postgres user and database.
+create_postgres_user "$invidious_dbhost" "$invidious_user"
+create_postgres_db   "$invidious_dbhost" "$invidious_dbname" "$invidious_user"
 
 # Clone git repo.
 install_directory -o "$invidious_user" -g "$invidious_user" -m 0775 "$invidious_home"
@@ -48,7 +54,7 @@ su -m "$invidious_user" -c "git -C ${invidious_repo_dir} switch ${invidious_bran
 install_template -o "$invidious_user" -g "$invidious_user" -m 0600 "${invidious_repo_dir}/config/config.yml"
 
 # Copy invidious rc script.
-#install_file -m 0555 /usr/local/etc/rc.d/invidious
+install_file -m 0555 /usr/local/etc/rc.d/invidious
 
 # Copy TLS certificate for nginx.
 install_certificate     -m 0644 "$fqdn" "$invidious_tls_cert"
@@ -59,8 +65,13 @@ install_template -m 0644           \
   /usr/local/etc/nginx/nginx.conf  \
   /usr/local/etc/nginx/vhosts.conf
 
+# Start daemons.
 sysrc -v               \
   invidious_enable=YES \
-  nginx_enable=YES \
-#service invidious restart
+  nginx_enable=YES
+service invidious restart
 service nginx restart
+
+# Copy invidous auto-update script.
+install_file -m 0555 /usr/local/libexec/invidious-update
+install_template -m 0644 /etc/cron.d/invidious-update
