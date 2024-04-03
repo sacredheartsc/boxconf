@@ -14,5 +14,34 @@ server {
   ssl_certificate      ${git_tls_cert};
   ssl_certificate_key  ${git_tls_key};
 
+  auth_gss_keytab ${git_keytab};
+  auth_gss_allow_basic_fallback on;
+
   add_header Strict-Transport-Security "max-age=63072000" always;
+
+  root /usr/local/www/cgit;
+  try_files \$uri @cgit;
+
+  location ~ '^.+/(HEAD|info/refs|objects/(info/[^/]+|[0-9a-f]{2}/[0-9a-f]{38}|pack/pack-[0-9a-f]{40}\.(pack|idx))|git-(upload|receive)-pack)$' {
+    auth_gss on;
+    satisfy any;
+$(printf '    deny %s;\n' $kerberized_cidrs)
+    allow all;
+    include fastcgi_params;
+    fastcgi_param SCRIPT_FILENAME /usr/local/libexec/gitolite/gitolite-shell;
+    fastcgi_param PATH_INFO \$uri;
+    fastcgi_param GIT_HTTP_EXPORT_ALL '';
+    fastcgi_param GIT_PROJECT_ROOT ${gitolite_home}/repositories;
+    fastcgi_param GITOLITE_HTTP_HOME ${gitolite_home};
+    fastcgi_param PATH /sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin;
+    fastcgi_pass unix:${gitolite_fcgiwrap_socket};
+  }
+
+  location @cgit {
+    include fastcgi_params;
+    fastcgi_param SCRIPT_FILENAME /usr/local/www/cgit/cgit.cgi;
+    fastcgi_param SCRIPT_NAME '';
+    fastcgi_param PATH_INFO \$uri;
+    fastcgi_pass unix:${cgit_fcgiwrap_socket};
+  }
 }

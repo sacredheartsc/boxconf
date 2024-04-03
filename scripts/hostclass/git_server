@@ -3,13 +3,21 @@
 : ${gitolite_user:='s-gitolite'}
 : ${gitolite_access_role:='gitolite-access'}
 : ${gitolite_admin_role:='gitolite-admin'}
+: ${cgit_clone_urls:="https://${fqdn} ssh://git@${fqdn}"}
+: ${cgit_root_title:="${organization} Git Repo"}
+: ${cgit_root_desc:="Source code for various ${organization} projects."}
+: ${cgit_pygments_style:='default'}
+: ${cgit_cache_size:='16000'}
 
-gitolite_local_user=git
-gitolite_home=/usr/local/git
-gitolite_client_keytab="${keytab_dir}/git-client.keytab"
 git_tls_cert=/usr/local/etc/nginx/git.crt
 git_tls_key=/usr/local/etc/nginx/git.key
 git_keytab="${keytab_dir}/git.keytab"
+gitolite_local_user=git
+gitolite_home=/usr/local/git
+gitolite_client_keytab="${keytab_dir}/git-client.keytab"
+gitolite_fcgiwrap_socket=/var/run/fcgiwrap/gitolite.sock
+cgit_cache_dir=/var/cache/cgit
+cgit_fcgiwrap_socket=/var/run/fcgiwrap/cgit.sock
 
 # Install packages.
 pkg install -y   \
@@ -18,13 +26,19 @@ pkg install -y   \
   gitolite       \
   fcgiwrap       \
   p5-perl-ldap   \
-  p5-Authen-SASL
+  p5-Authen-SASL \
+  py39-pygments  \
+  py39-docutils  \
+  py39-markdown
 
 # Create ZFS dataset for gitolite repositories.
 create_dataset -o "mountpoint=$gitolite_home" "${state_dataset}/git"
 
 # Set ownership on gitolite dataset.
 install_directory -o "$gitolite_local_user" -g "$gitolite_local_user" -m 0700 "$gitolite_home"
+
+# Add www user to git group, so it can read git repositories.
+pw groupmod "$gitolite_local_user" -m www
 
 # Create gitolite user account.
 create_robot                \
@@ -41,9 +55,9 @@ get_keytab                  \
 
 # Generate gitolite configuration.
 install_directory -o "$gitolite_local_user" -g "$gitolite_local_user" -m 0750 \
-  "$gitolite_home"                                                \
-  "${gitolite_home}/.gitolite"                                    \
-  "${gitolite_home}/.gitolite/conf"                               \
+  "$gitolite_home"                                                            \
+  "${gitolite_home}/.gitolite"                                                \
+  "${gitolite_home}/.gitolite/conf"                                           \
   "${gitolite_home}/.gitolite/logs"
 install_file -o "$gitolite_local_user" -g "$gitolite_local_user" -m 0600 "${gitolite_home}/.gitolite.rc"
 
@@ -58,6 +72,13 @@ install_file -m 0555                         \
   /usr/local/libexec/gitolite-authorizedkeys
 
 install_template -o "$gitolite_local_user" -g "$gitolite_local_user" -m 0644 "${gitolite_home}/ldap.conf.pl"
+
+# Generate cgit configuration.
+install_template -m 0644 /usr/local/etc/cgitrc
+install_template -m 0555 /usr/local/lib/cgit/filters/syntax-highlighting-custom.py
+
+# Create cgit cache directory.
+install_directory -o root -g www -m 0770 "$cgit_cache_dir"
 
 # Copy TLS certificate for nginx.
 install_certificate     -m 0644 "$fqdn" "$git_tls_cert"
@@ -82,11 +103,24 @@ get_keytab        \
 install_template -m 0600 /etc/ssh/sshd_config.d/gitolite.conf
 
 # Enable and start daemons.
-sysrc -v                                      \
-  nginx_enable=YES                            \
-  fcgiwrap_enable=YES                         \
-  kstart_instances+=gitolite                  \
-  kstart_gitolite_keytab="$gitolite_client_keytab" \
+sysrc -v                                                      \
+  nginx_enable=YES                                            \
+  fcgiwrap_enable=YES                                         \
+  fcgiwrap_profiles+='cgit gitolite'                          \
+  fcgiwrap_cgit_flags='-f'                                    \
+  fcgiwrap_cgit_user=www                                      \
+  fcgiwrap_cgit_group=www                                     \
+  fcgiwrap_cgit_socket_owner=www                              \
+  fcgiwrap_cgit_socket_group=www                              \
+  fcgiwrap_cgit_socket="unix:${cgit_fcgiwrap_socket}"         \
+  fcgiwrap_gitolite_flags='-f'                                \
+  fcgiwrap_gitolite_user="$gitolite_local_user"               \
+  fcgiwrap_gitolite_group="$gitolite_local_user"              \
+  fcgiwrap_gitolite_socket_owner=www                          \
+  fcgiwrap_gitolite_socket_group=www                          \
+  fcgiwrap_gitolite_socket="unix:${gitolite_fcgiwrap_socket}" \
+  kstart_instances+=gitolite                                  \
+  kstart_gitolite_keytab="$gitolite_client_keytab"            \
   kstart_gitolite_flags="-aLK 120 -g ${gitolite_local_user} -o ${gitolite_local_user} -k /tmp/krb5cc_$(id -u "$gitolite_local_user") -u ${gitolite_user}"
 
 for svc in kstart nginx fcgiwrap sshd; do

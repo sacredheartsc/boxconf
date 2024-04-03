@@ -2,6 +2,7 @@
   UMASK           =>  0027,
   GIT_CONFIG_KEYS =>  '.*',
   LOG_DEST        => 'syslog',
+  LOG_FACILITY    => 'daemon',
   ROLES => {
     READERS       =>  1,
     WRITERS       =>  1,

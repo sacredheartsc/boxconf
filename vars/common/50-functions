@@ -231,7 +231,7 @@ EOF
 create_role(){
   unset _crl_gid
   while getopts g: _crl_opt; do
-    case $_cg_opt in
+    case $_crl_opt in
       g) _crl=$OPTARG ;;
     esac
   done

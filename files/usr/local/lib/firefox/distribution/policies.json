@@ -83,6 +83,11 @@
     "DisablePocket": true,
     "DisableAppUpdate": true,
     "CaptivePortal": false,
+    "Certificates": {
+      "Install": [
+        "${ca_cert}"
+      ]
+    },
     "DisableFeedbackCommands": true,
     "DisableFirefoxAccounts": true,
     "DisableFirefoxStudies": true,

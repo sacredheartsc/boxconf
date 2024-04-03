@@ -19,6 +19,8 @@ saslauthd_user=cyrus
 
 system_ca_dir=/etc/ssl/certs
 
+python_path=$(echo /usr/local/bin/python3.[0-9] | cut -d' ' -f1)
+
 # pkg needs this or else it tries to prompt.
 export ASSUME_ALWAYS_YES=yes
 
