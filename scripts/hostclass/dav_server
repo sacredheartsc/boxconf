@@ -107,9 +107,7 @@ install_certificate     -m 0644 "$fqdn" "$davical_tls_cert"
 install_certificate_key -m 0600 "$fqdn" "$davical_tls_key"
 
 # Generate nginx configuration.
-install_file -m 0644                  \
-  /etc/ssl/openssl-legacy.cnf         \
-  /usr/local/etc/nginx/fastcgi_params
+install_file -m 0644 /usr/local/etc/nginx/fastcgi_params
 install_template -m 0644           \
   /usr/local/etc/nginx/nginx.conf  \
   /usr/local/etc/nginx/vhosts.conf

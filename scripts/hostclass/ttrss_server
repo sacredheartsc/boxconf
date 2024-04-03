@@ -116,9 +116,7 @@ get_keytab        \
   "HTTP/${fqdn}"
 
 # Generate nginx configuration.
-install_file -m 0644                  \
-  /etc/ssl/openssl-legacy.cnf         \
-  /usr/local/etc/nginx/fastcgi_params
+install_file -m 0644 /usr/local/etc/nginx/fastcgi_params
 install_template -m 0644           \
   /usr/local/etc/nginx/nginx.conf  \
   /usr/local/etc/nginx/vhosts.conf

@@ -57,16 +57,14 @@ install_file -m 0555                         \
   /usr/local/libexec/gitolite-grouplist      \
   /usr/local/libexec/gitolite-authorizedkeys
 
-install_template -m 0644 "${gitolite_home}/ldap.conf.pl"
+install_template -o "$gitolite_local_user" -g "$gitolite_local_user" -m 0644 "${gitolite_home}/ldap.conf.pl"
 
 # Copy TLS certificate for nginx.
 install_certificate     -m 0644 "$fqdn" "$git_tls_cert"
 install_certificate_key -m 0600 "$fqdn" "$git_tls_key"
 
 # Generate nginx configuration.
-install_file -m 0644                  \
-  /etc/ssl/openssl-legacy.cnf         \
-  /usr/local/etc/nginx/fastcgi_params
+install_file -m 0644 /usr/local/etc/nginx/fastcgi_params
 install_template -m 0644           \
   /usr/local/etc/nginx/nginx.conf  \
   /usr/local/etc/nginx/vhosts.conf
@@ -77,7 +75,7 @@ get_keytab        \
   -m 0640         \
   -o root         \
   -g www          \
-  "$git_keytab" \
+  "$git_keytab"   \
   "HTTP/${fqdn}"
 
 # Generate sshd configuration.
