@@ -18,6 +18,7 @@ gitolite_client_keytab="${keytab_dir}/git-client.keytab"
 gitolite_fcgiwrap_socket=/var/run/fcgiwrap/gitolite.sock
 cgit_cache_dir=/var/cache/cgit
 cgit_fcgiwrap_socket=/var/run/fcgiwrap/cgit.sock
+cgit_webroot=/usr/local/www/cgit
 
 # Install packages.
 pkg install -y   \
@@ -79,6 +80,13 @@ install_template -m 0555 /usr/local/lib/cgit/filters/syntax-highlighting-custom.
 
 # Create cgit cache directory.
 install_directory -o root -g www -m 0770 "$cgit_cache_dir"
+
+# Copy custom assets.
+install_file -m 0644                   \
+  "${cgit_webroot}/custom-style.css"   \
+  "${cgit_webroot}/custom-favicon.ico" \
+  "${cgit_webroot}/custom-logo.png"    \
+  "${cgit_webroot}/custom-robots.txt"
 
 # Copy TLS certificate for nginx.
 install_certificate     -m 0644 "$fqdn" "$git_tls_cert"

@@ -21,6 +21,11 @@ cache-size=${cgit_cache_size}
 source-filter=/usr/local/lib/cgit/filters/syntax-highlighting-custom.py
 about-filter=/usr/local/lib/cgit/filters/about-formatting.sh
 
+favicon=/custom-favicon.ico
+logo=/custom-logo.png
+css=/custom-style.css
+robots=/custom-robots.txt
+
 mimetype.gif=image/gif
 mimetype.html=text/html
 mimetype.jpg=image/jpeg

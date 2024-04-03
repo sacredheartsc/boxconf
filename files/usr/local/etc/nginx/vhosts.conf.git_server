@@ -19,7 +19,7 @@ server {
 
   add_header Strict-Transport-Security "max-age=63072000" always;
 
-  root /usr/local/www/cgit;
+  root ${cgit_webroot};
   try_files \$uri @cgit;
 
   location ~ '^.+/(HEAD|info/refs|objects/(info/[^/]+|[0-9a-f]{2}/[0-9a-f]{38}|pack/pack-[0-9a-f]{40}\.(pack|idx))|git-(upload|receive)-pack)$' {
@@ -39,7 +39,7 @@ $(printf '    deny %s;\n' $kerberized_cidrs)
 
   location @cgit {
     include fastcgi_params;
-    fastcgi_param SCRIPT_FILENAME /usr/local/www/cgit/cgit.cgi;
+    fastcgi_param SCRIPT_FILENAME ${cgit_webroot}/cgit.cgi;
     fastcgi_param SCRIPT_NAME '';
     fastcgi_param PATH_INFO \$uri;
     fastcgi_pass unix:${cgit_fcgiwrap_socket};
