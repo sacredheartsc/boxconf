@@ -2,3 +2,4 @@
 
 cnames=pkg
 poudriere_make_jobs_number=8
+poudriere_ccache_size='50.0G'

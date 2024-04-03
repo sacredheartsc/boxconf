@@ -15,6 +15,10 @@ usage(){
   exit 2
 }
 
+as_invidious(){
+  su -m "$invidious_user" -c "HOME=~${invidious_user} ${@}"
+}
+
 while getopts hq opt; do
   case $opt in
     h) usage ;;
@@ -31,12 +35,12 @@ invidious_dir=$2
 cd "$invidious_dir"
 
 su -m "$invidious_user" -c 'git fetch'
-local_rev=$(su -m "$invidious_user" -c 'git rev-parse HEAD')
-upstream_rev=$(su -m "$invidious_user" -c 'git rev-parse "@{u}"')
+local_rev=$(as_invidious 'git rev-parse HEAD')
+upstream_rev=$(as_invidious 'git rev-parse "@{u}"')
 
 if [ "$local_rev" != "$upstream_rev" ]; then
-  echo "updating invidious to rev ${remote_rev}"
-  su -m "$invidious_user" -c 'git pull --ff-only && shards install --production && crystal build src/invidious.cr --release'
+  echo "updating invidious to rev ${upstream_rev}"
+  as_invidious 'git pull --ff-only && shards install --production && crystal build src/invidious.cr --release'
 else
   echo "invidious already up to date at rev ${local_rev}"
 fi

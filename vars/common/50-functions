@@ -148,7 +148,8 @@ create_robot(){
 
   _crb_name=$1; shift
 
-  ldap_add "cn=${_crb_name},${private_groups_basedn}" <<EOF
+  if [ -n "${_crb_uid:-}" ]; then
+    ldap_add "cn=${_crb_name},${private_groups_basedn}" <<EOF
 objectClass: groupOfMembers
 objectClass: posixGroup
 cn: ${_crb_name}
@@ -156,7 +157,7 @@ gidNumber: ${_crb_uid}
 member: uid=${_crb_name},${robots_basedn}
 EOF
 
-  ldap_add "uid=${_crb_name},${robots_basedn}" <<EOF
+    ldap_add "uid=${_crb_name},${robots_basedn}" <<EOF
 objectClass: account
 objectClass: posixAccount
 objectClass: krb5KDCEntry
@@ -174,6 +175,21 @@ krb5MaxLife: ${krb5_max_ticket_lifetime}
 krb5MaxRenew: ${krb5_max_renew_lifetime}
 krb5KDCFlags: ${krb5_default_princ_flags}
 EOF
+  else
+    ldap_add "uid=${_crb_name},${robots_basedn}" <<EOF
+objectClass: account
+objectClass: simpleSecurityObject
+objectClass: krb5KDCEntry
+uid: ${_crb_name}
+cn: ${_crb_comment:-${_crb_name}}
+userPassword: {SASL}${_crb_name}@${realm}
+krb5PrincipalName: ${_crb_name}@${realm}
+krb5KeyVersionNumber: 0
+krb5MaxLife: ${krb5_max_ticket_lifetime}
+krb5MaxRenew: ${krb5_max_renew_lifetime}
+krb5KDCFlags: ${krb5_default_princ_flags}
+EOF
+  fi
 
   if [ -n "${_crb_password:-}" ]; then
     set_password "$_crb_name" "$_crb_password"

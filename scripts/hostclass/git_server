@@ -1,0 +1,101 @@
+#!/bin/sh
+
+: ${gitolite_user:='s-gitolite'}
+: ${gitolite_access_role:='gitolite-access'}
+: ${gitolite_admin_role:='gitolite-admin'}
+
+gitolite_local_user=git
+gitolite_home=/usr/local/git
+gitolite_client_keytab="${keytab_dir}/git-client.keytab"
+git_tls_cert=/usr/local/etc/nginx/git.crt
+git_tls_key=/usr/local/etc/nginx/git.key
+git_keytab="${keytab_dir}/git.keytab"
+
+# Install packages.
+pkg install -y   \
+  nginx          \
+  cgit           \
+  gitolite       \
+  fcgiwrap       \
+  p5-perl-ldap   \
+  p5-Authen-SASL
+
+# Create ZFS dataset for gitolite repositories.
+create_dataset -o "mountpoint=$gitolite_home" "${state_dataset}/git"
+
+# Set ownership on unifi data dir.
+install_directory -o "$gitolite_local_user" -g "$gitolite_local_user" -m 0700 "$gitolite_home"
+
+# Create gitolite user account.
+create_robot                \
+  -c "Gitolite Pseudo-User" \
+  "$gitolite_user"
+
+# Get keytab for gitolite user.
+get_keytab                  \
+  -o root                   \
+  -g "$gitolite_local_user" \
+  -m 0640                   \
+  "$gitolite_client_keytab" \
+  "$gitolite_user"
+
+# Generate gitolite configuration.
+install_directory -o "$gitolite_local_user" -g "$gitolite_local_user" -m 0750 \
+  "$gitolite_home"                                                \
+  "${gitolite_home}/.gitolite"                                    \
+  "${gitolite_home}/.gitolite/conf"                               \
+  "${gitolite_home}/.gitolite/logs"
+install_file -o "$gitolite_local_user" -g "$gitolite_local_user" -m 0600 "${gitolite_home}/.gitolite.rc"
+
+[ -f "${gitolite_home}/.gitolite/conf/gitolite.conf" ] \
+  || install_template -o "$gitolite_local_user" -g "$gitolite_local_user" -m 0640 "${gitolite_home}/.gitolite/conf/gitolite.conf"
+
+[ -f "${gitolite_home}/.gitolite/conf/gitolite.conf-compiled.pm" ] \
+  || su "$gitolite_local_user" -c 'gitolite setup'
+
+install_file -m 0555                         \
+  /usr/local/libexec/gitolite-grouplist      \
+  /usr/local/libexec/gitolite-authorizedkeys
+
+install_template -m 0644 "${gitolite_home}/ldap.conf.pl"
+
+# Copy TLS certificate for nginx.
+install_certificate     -m 0644 "$fqdn" "$git_tls_cert"
+install_certificate_key -m 0600 "$fqdn" "$git_tls_key"
+
+# Generate nginx configuration.
+install_file -m 0644                  \
+  /etc/ssl/openssl-legacy.cnf         \
+  /usr/local/etc/nginx/fastcgi_params
+install_template -m 0644           \
+  /usr/local/etc/nginx/nginx.conf  \
+  /usr/local/etc/nginx/vhosts.conf
+
+# Create HTTP service principal and keytab.
+create_service "HTTP/${fqdn}"
+get_keytab        \
+  -m 0640         \
+  -o root         \
+  -g www          \
+  "$git_keytab" \
+  "HTTP/${fqdn}"
+
+# Generate sshd configuration.
+install_template -m 0600 /etc/ssh/sshd_config.d/gitolite.conf
+
+# Enable and start daemons.
+sysrc -v                                      \
+  nginx_enable=YES                            \
+  fcgiwrap_enable=YES                         \
+  kstart_instances+=gitolite                  \
+  kstart_gitolite_keytab="$gitolite_client_keytab" \
+  kstart_gitolite_flags="-aLK 120 -g ${gitolite_local_user} -o ${gitolite_local_user} -k /tmp/krb5cc_$(id -u "$gitolite_local_user") -u ${gitolite_user}"
+
+for svc in kstart nginx fcgiwrap sshd; do
+  service "$svc" restart
+done
+
+# Create roles.
+create_role               \
+  "$gitolite_access_role" \
+  "$gitolite_admin_role"

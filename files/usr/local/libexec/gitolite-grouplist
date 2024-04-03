@@ -1,0 +1,37 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+use Net::LDAP;
+use Net::LDAP::Util qw(ldap_explode_dn escape_filter_value);
+use Authen::SASL;
+
+our ($ldap_uris, $user_basedn, $group_basedn);
+require "$ENV{HOME}/ldap.conf.pl";
+
+@ARGV == 1 or die "usage: $0 USERNAME\n";
+my $username = $ARGV[0];
+
+my $conn = Net::LDAP->new($ldap_uris, version => '3') or die "$@";
+my $sasl = Authen::SASL->new('GSSAPI');
+my $status = $conn->bind(sasl => $sasl);
+$status->code and die $status->error;
+
+my $search = $conn->search(
+  scope  => 'sub',
+  base   => $user_basedn,
+  filter => '(&(|(objectClass=account)(objectClass=inetOrgPerson))(uid=' . escape_filter_value($username) . '))',
+  attrs  => ['memberOf']);
+
+$search->entries == 0 and die "no such user: $username\n";
+$search->entries  > 1 and die "multiple results returned for user: $username\n";
+
+foreach my $group_dn (($search->entries)[0]->get_value('memberOf')) {
+  next unless $group_dn =~ /,\Q$group_basedn\E$/;
+
+  my $parts = ldap_explode_dn($group_dn);
+  next unless exists $parts->[0]{'CN'};
+
+  print $parts->[0]{'CN'} =~ s/\s/_/gr . "\n";
+}

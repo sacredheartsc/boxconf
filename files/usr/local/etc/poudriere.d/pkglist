@@ -13,6 +13,7 @@ databases/redis
 devel/ccache
 devel/cgit
 devel/git@lite
+devel/gitolite
 devel/php${php_version}-gettext
 devel/py-pip
 devel/shards
@@ -62,7 +63,9 @@ net/freeradius3
 net/nss-pam-ldapd-sasl
 net/openldap26-client
 net/openldap26-server
+net/p5-perl-ldap
 net/php${php_version}-ldap
+net/py-python-ldap
 net/rsync
 net/syncthing
 ports-mgmt/poudriere
@@ -81,6 +84,7 @@ security/vaultwarden
 sysutils/htop
 sysutils/k3b
 sysutils/lsof
+sysutils/p5-Sys-Syslog
 sysutils/pwgen
 sysutils/rsyslog8
 sysutils/stow
@@ -88,8 +92,12 @@ sysutils/tmux
 sysutils/tree
 textproc/jq
 textproc/php${php_version}-xml
+textproc/py-docutils
+textproc/py-markdown
+textproc/py-pygments
 www/php${php_version}-opcache
 www/php${php_version}-session
+www/fcgiwrap
 www/firefox
 www/nginx
 www/tt-rss

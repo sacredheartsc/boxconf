@@ -1,0 +1,12 @@
+[ req ]
+req_extensions = v3_req
+distinguished_name = req_distinguished_name
+prompt = no
+
+[ v3_req ]
+basicConstraints = critical,CA:FALSE
+extendedKeyUsage = serverAuth
+subjectAltName = DNS:git1.test.sacredheartsc.com,DNS:git.test.sacredheartsc.com
+
+[ req_distinguished_name ]
+CN = git1.test.sacredheartsc.com
