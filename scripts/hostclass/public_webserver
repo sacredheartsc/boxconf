@@ -1,0 +1,30 @@
+#!/bin/sh
+
+# webserver_acme_certs='site1 site2'
+# webserver_site1_domains='example.net example.com'
+
+nginx_conf_dir=/usr/local/etc/nginx
+nginx_user=www
+
+# Install packages.
+pkg install -y nginx
+
+# Acquire public TLS certificate.
+install_file /usr/local/etc/sudoers.d/acme
+
+for cert in ${websever_acme_certs:-}; do
+  eval "acme_domains=\${webserver_${cert}_domains}"
+  get_acme_certificate                  \
+    -c "${nginx_conf_dir}/${cert}.crt"  \
+    -k "${nginx_conf_dir}/${cert}.key"  \
+    -g "$nginx_user"                    \
+    -r 'sudo service nginx reload'      \
+    $acme_domains
+done
+
+install_template -m 0644           \
+  /usr/local/etc/nginx/nginx.conf  \
+  /usr/local/etc/nginx/vhosts.conf
+
+sysrc -v nginx_enable=YES
+service nginx restart

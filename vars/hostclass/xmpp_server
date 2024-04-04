@@ -1,0 +1,3 @@
+#!/bin/bash
+
+allowed_tcp_ports="ssh http https xmpp-client xmpp-server"

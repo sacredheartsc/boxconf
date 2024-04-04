@@ -1,0 +1,9 @@
+#!/bin/sh
+
+# Install required packages.
+pkg install -y \
+  prosody      \
+  luadbi       \
+  lualdap      \
+  nginx
+

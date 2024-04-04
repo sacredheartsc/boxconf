@@ -1,0 +1,19 @@
+#!/bin/sh
+
+: ${nsd_zones:=''}
+: ${nsd_threads:='2'}
+
+nsd_conf_dir=/usr/local/etc/nsd
+nsd_run_dir=/var/run/nsd
+
+pkg install -y nsd
+
+install_template -m 0644 /usr/local/etc/nsd/nsd.conf
+
+for zone in $nsd_zones; do
+  eval "zone_name=\${nsd_${zone}_zone}"
+  install_file -m 0644 "${nsd_conf_dir}/${zone_name}.zone"
+done
+
+sysrc -v nsd_enable=YES
+service nsd restart

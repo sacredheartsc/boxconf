@@ -5,6 +5,7 @@ audio/juk
 audio/kid3
 audio/kmix
 converters/php${php_version}-iconv
+databases/luadbi
 databases/php${php_version}-pdo_pgsql
 databases/php${php_version}-pgsql
 databases/postgresql15-client
@@ -60,6 +61,7 @@ net-mgmt/networkmgr
 net-mgmt/unifi8
 net/asterisk18
 net/freeradius3
+net/lualdap
 net/nss-pam-ldapd-sasl
 net/openldap26-client
 net/openldap26-server

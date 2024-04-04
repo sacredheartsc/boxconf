@@ -1,0 +1,20 @@
+$TTL    3600
+$ORIGIN test.sacredheartsc.com.
+
+@  IN  SOA  ns1.test.sacredheartsc.com.  hostmaster.test.sacredheartsc.com.  (
+  2022111051 ; serial
+  1d ; refresh
+  3m ; retry
+  1w ; expire
+  3h ; minimum
+)
+
+@    IN  NS    ns1.test.sacredheartsc.com.
+@    IN  NS    ns2.test.sacredheartsc.com.
+@    IN  NS    ns3.test.sacredheartsc.com.
+ns1  IN  A     208.94.148.63
+ns1  IN  AAAA  2600:1800:5::1:1f
+ns2  IN  A     208.80.124.63
+ns2  IN  AAAA  2600:1801:6::1:1f
+ns3  IN  A     208.80.126.63
+ns3  IN  AAAA  2600:1802:7::1:1f
